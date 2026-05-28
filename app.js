@@ -4,6 +4,7 @@ class JamBoardCore {
         
         this.BPM = 110;
         this.stepTime = 60 / this.BPM / 2;
+        this.audio.setDelayTime(this.stepTime * 1.5); // Initialize delay time immediately to prevent browser muting
         this.rows = ['Rhythm', 'Bass', 'Melody', 'FX', 'Vocals'];
         this.STEPS = 8;
         this.MAX_TIMELINE_SLOTS = 16;
@@ -22,6 +23,7 @@ class JamBoardCore {
         this.editingLoopId = null;
         
         this.colorMap = { 'red': 'rgba(255, 51, 102, 0.4)', 'yellow': 'rgba(255, 204, 0, 0.4)', 'blue': 'rgba(0, 204, 255, 0.4)', 'green': 'rgba(51, 255, 102, 0.4)', 'purple': 'rgba(204, 51, 255, 0.4)' };
+        this.solidColors = { 'red': '#ff3366', 'yellow': '#ffcc00', 'blue': '#00ccff', 'green': '#33ff66', 'purple': '#cc33ff' };
 
         this.gridEl = document.getElementById('grid');
         this.cells = [];
@@ -170,7 +172,7 @@ class JamBoardCore {
             e.stopPropagation();
             if (e.dataTransfer.getData('source') === 'grid' && !e.target.closest('.cell') && !e.target.closest('.row-fx-slot')) {
                 const dragging = document.querySelector('.dragging'); 
-                if (dragging) {
+                if (dragging) { 
                     const parent = dragging.parentElement;
                     const type = dragging.dataset.type;
                     const fxType = dragging.dataset.fx;
@@ -205,40 +207,30 @@ class JamBoardCore {
             rowFx: []
         };
         
+        const parseFx = (container) => {
+            return Array.from(container.querySelectorAll('.fx-token')).map(el => ({
+                fx: el.dataset.fx,
+                amount: parseFloat(el.dataset.amount),
+                boundColor: el.dataset.boundColor || 'all'
+            }));
+        };
+
         for (let r = 0; r < this.rows.length; r++) {
-            let crush = 0; let echo = 0; let reverb = 0; let chorus = 0;
-            const rowFxEls = document.querySelectorAll(`.row-fx-slot[data-row="${r}"] .fx-token`);
-            rowFxEls.forEach(el => { 
-                if(el.dataset.fx === 'crush') crush += parseFloat(el.dataset.amount); 
-                if(el.dataset.fx === 'echo') echo += parseFloat(el.dataset.amount); 
-                if(el.dataset.fx === 'reverb') reverb += parseFloat(el.dataset.amount); 
-                if(el.dataset.fx === 'chorus') chorus += parseFloat(el.dataset.amount); 
-            });
-            snapshot.rowFx.push({ crush, echo, reverb, chorus });
+            const slot = document.querySelector(`.row-fx-slot[data-row="${r}"]`);
+            snapshot.rowFx.push(parseFx(slot));
         }
 
         for (let step = 0; step < this.STEPS; step++) {
             const stepData = [];
             for (let r = 0; r < this.rows.length; r++) {
                 const cell = this.cells[r][step];
-                
                 const blocks = Array.from(cell.querySelectorAll('.block')).map(b => ({
                     color: b.dataset.color,
                     pitch: parseInt(b.dataset.pitch),
                     volume: parseFloat(b.dataset.volume),
                     kit: b.dataset.kit || this.audio.KITS[this.audio.activeKitIndex]
                 }));
-                
-                let crush = 0; let echo = 0; let reverb = 0; let chorus = 0;
-                const blockFxEls = cell.querySelectorAll('.fx-token');
-                blockFxEls.forEach(el => { 
-                    if(el.dataset.fx === 'crush') crush += parseFloat(el.dataset.amount); 
-                    if(el.dataset.fx === 'echo') echo += parseFloat(el.dataset.amount); 
-                    if(el.dataset.fx === 'reverb') reverb += parseFloat(el.dataset.amount); 
-                    if(el.dataset.fx === 'chorus') chorus += parseFloat(el.dataset.amount); 
-                });
-
-                stepData.push({ blocks, cellFx: { crush, echo, reverb, chorus } });
+                stepData.push({ blocks, cellFx: parseFx(cell) });
             }
             snapshot.steps.push(stepData);
         }
@@ -340,23 +332,20 @@ class JamBoardCore {
 
         const loop = this.loopMemory[loopId];
 
-        const buildFx = (target, type, totalAmt) => {
-            let amt = totalAmt;
-            while(amt > 0) {
-                let val = Math.min(1.0, amt);
-                target.appendChild(this.createFxDOM(type, val));
-                amt -= val;
-            }
-            if (totalAmt > 0) this.layoutFxTokens(target, type);
+        const buildFxArr = (target, fxArr) => {
+            const typesPresent = new Set();
+            fxArr.forEach(fData => {
+                target.appendChild(this.createFxDOM(fData.fx, fData.amount, fData.boundColor));
+                typesPresent.add(fData.fx);
+            });
+            typesPresent.forEach(type => this.layoutFxTokens(target, type));
         };
 
         for (let r = 0; r < this.rows.length; r++) {
-            const rFx = loop.rowFx[r];
             const slot = document.querySelector(`.row-fx-slot[data-row="${r}"]`);
-            if (rFx.crush > 0) buildFx(slot, 'crush', rFx.crush);
-            if (rFx.echo > 0) buildFx(slot, 'echo', rFx.echo);
-            if (rFx.reverb > 0) buildFx(slot, 'reverb', rFx.reverb);
-            if (rFx.chorus > 0) buildFx(slot, 'chorus', rFx.chorus);
+            if (Array.isArray(loop.rowFx[r])) {
+                buildFxArr(slot, loop.rowFx[r]);
+            }
         }
 
         for (let step = 0; step < this.STEPS; step++) {
@@ -369,10 +358,9 @@ class JamBoardCore {
                 });
                 this.layoutBlocks(cell);
                 
-                if (cellData.cellFx.crush > 0) buildFx(cell, 'crush', cellData.cellFx.crush);
-                if (cellData.cellFx.echo > 0) buildFx(cell, 'echo', cellData.cellFx.echo);
-                if (cellData.cellFx.reverb > 0) buildFx(cell, 'reverb', cellData.cellFx.reverb);
-                if (cellData.cellFx.chorus > 0) buildFx(cell, 'chorus', cellData.cellFx.chorus);
+                if (Array.isArray(cellData.cellFx)) {
+                    buildFxArr(cell, cellData.cellFx);
+                }
             }
         }
     }
@@ -437,10 +425,10 @@ class JamBoardCore {
         const h = 100 / count; 
         blocks.forEach((b, i) => {
             b.style.position = 'absolute';
-            b.style.height = `calc(${h}% - 10px)`; 
+            b.style.height = `${h}%`; 
             b.style.width = 'calc(100% - 36px)'; 
             b.style.left = '18px'; 
-            b.style.bottom = `calc(${i * h}% + 5px)`;
+            b.style.bottom = `${i * h}%`;
         });
     }
 
@@ -451,7 +439,7 @@ class JamBoardCore {
         const h = 35 / count; 
         tokens.forEach((t, i) => {
             t.style.height = `${h}px`;
-            t.style.zIndex = '3'; // Fixes the overlap issue by forcing FX above blocks
+            t.style.zIndex = '3';
             if (fxData === 'crush' || fxData === 'reverb') {
                 t.style.top = `${5 + (i * h)}px`;
                 t.style.bottom = 'auto';
@@ -460,6 +448,19 @@ class JamBoardCore {
                 t.style.top = 'auto';
             }
         });
+    }
+
+    updateFxColor(token) {
+        const bound = token.dataset.boundColor || 'all';
+        if (bound === 'all') {
+            const fx = token.dataset.fx;
+            if (fx === 'crush') token.style.borderColor = '#f66';
+            if (fx === 'echo') token.style.borderColor = '#66f';
+            if (fx === 'reverb') token.style.borderColor = '#aa4';
+            if (fx === 'chorus') token.style.borderColor = '#4aa';
+        } else {
+            token.style.borderColor = this.solidColors[bound];
+        }
     }
 
     createBlockDOM(color, pitch, volume = 1.0, kit = null) {
@@ -507,10 +508,12 @@ class JamBoardCore {
         block.addEventListener('dragend', () => block.classList.remove('dragging')); return block;
     }
 
-    createFxDOM(fxType, amount = 1.0) {
+    createFxDOM(fxType, amount = 1.0, boundColor = 'all') {
         const token = document.createElement('div'); token.className = 'fx-token'; token.dataset.type = 'fx'; token.dataset.fx = fxType; token.dataset.amount = amount; token.draggable = true;
+        token.dataset.boundColor = boundColor;
         token.innerHTML = `<div class="fx-bar" style="height: ${amount * 100}%"></div><span class="fx-label">${fxType.toUpperCase()}</span>`;
         token.style.zIndex = '3';
+        this.updateFxColor(token);
         
         token.addEventListener('click', (e) => { 
             if (e.shiftKey) { 
@@ -519,6 +522,13 @@ class JamBoardCore {
                 if (parent) this.layoutFxTokens(parent, fxType);
                 return; 
             } 
+            if (e.ctrlKey || e.metaKey) {
+                const colors = ['all', 'red', 'yellow', 'blue', 'green', 'purple'];
+                let cur = colors.indexOf(token.dataset.boundColor || 'all');
+                token.dataset.boundColor = colors[(cur + 1) % colors.length];
+                this.updateFxColor(token);
+                return;
+            }
             let a = parseFloat(token.dataset.amount); a = a - 0.25; if(a < 0) a = 1.0;
             token.dataset.amount = a.toFixed(2); token.querySelector('.fx-bar').style.height = `${a * 100}%`;
         });
@@ -541,7 +551,6 @@ class JamBoardCore {
         if (source === 'grid' && dragging) {
             const oldParent = dragging.parentElement;
             if (target.classList.contains('cell') || target.classList.contains('row-fx-slot')) {
-                // Defer DOM reparenting by 1 frame to prevent browser drag-state lockups
                 setTimeout(() => {
                     target.appendChild(dragging);
                     if (type === 'fx') {
@@ -669,24 +678,29 @@ class JamBoardCore {
         if (this.playbackMode === 'GRID') { 
             for (let r = 0; r < this.rows.length; r++) { 
                 const blocks = this.cells[r][step].querySelectorAll('.block'); 
-                
-                let crush = 0; let echo = 0; let reverb = 0; let chorus = 0;
-                document.querySelectorAll(`.row-fx-slot[data-row="${r}"] .fx-token`).forEach(el => {
-                    if(el.dataset.fx === 'crush') crush += parseFloat(el.dataset.amount);
-                    if(el.dataset.fx === 'echo') echo += parseFloat(el.dataset.amount);
-                    if(el.dataset.fx === 'reverb') reverb += parseFloat(el.dataset.amount);
-                    if(el.dataset.fx === 'chorus') chorus += parseFloat(el.dataset.amount);
-                });
-                this.cells[r][step].querySelectorAll('.fx-token').forEach(el => {
-                    if(el.dataset.fx === 'crush') crush += parseFloat(el.dataset.amount);
-                    if(el.dataset.fx === 'echo') echo += parseFloat(el.dataset.amount);
-                    if(el.dataset.fx === 'reverb') reverb += parseFloat(el.dataset.amount);
-                    if(el.dataset.fx === 'chorus') chorus += parseFloat(el.dataset.amount);
-                });
+                const rowTokens = document.querySelectorAll(`.row-fx-slot[data-row="${r}"] .fx-token`);
+                const cellTokens = this.cells[r][step].querySelectorAll('.fx-token');
 
                 blocks.forEach(block => {
+                    const bColor = block.dataset.color;
+                    let crush = 0, echo = 0, reverb = 0, chorus = 0;
+                    
+                    const addFx = (el) => {
+                        const bound = el.dataset.boundColor || 'all';
+                        if (bound === 'all' || bound === bColor) {
+                            const amt = parseFloat(el.dataset.amount);
+                            if(el.dataset.fx === 'crush') crush += amt;
+                            if(el.dataset.fx === 'echo') echo += amt;
+                            if(el.dataset.fx === 'reverb') reverb += amt;
+                            if(el.dataset.fx === 'chorus') chorus += amt;
+                        }
+                    };
+
+                    rowTokens.forEach(addFx);
+                    cellTokens.forEach(addFx);
+
                     const finalVol = this.rowVolumes[r] * parseFloat(block.dataset.volume);
-                    this.audio.playNote(r, block.dataset.color, parseInt(block.dataset.pitch), finalVol, {crush, echo, reverb, chorus}, time, block.dataset.kit); 
+                    this.audio.playNote(r, bColor, parseInt(block.dataset.pitch), finalVol, {crush, echo, reverb, chorus}, time, block.dataset.kit); 
                 });
             } 
         } else if (this.playbackMode === 'SONG') { 
@@ -699,12 +713,30 @@ class JamBoardCore {
                             const rowFx = loop.rowFx[r];
                             if (colData[r].blocks) {
                                 colData[r].blocks.forEach(b => { 
-                                    const fx = { 
-                                        crush: rowFx.crush + colData[r].cellFx.crush, 
-                                        echo: rowFx.echo + colData[r].cellFx.echo,
-                                        reverb: rowFx.reverb + colData[r].cellFx.reverb,
-                                        chorus: rowFx.chorus + colData[r].cellFx.chorus
+                                    let crush = 0, echo = 0, reverb = 0, chorus = 0;
+                                    
+                                    const addMemFx = (fData) => {
+                                        if (fData.boundColor === 'all' || fData.boundColor === b.color) {
+                                            if(fData.fx === 'crush') crush += fData.amount;
+                                            if(fData.fx === 'echo') echo += fData.amount;
+                                            if(fData.fx === 'reverb') reverb += fData.amount;
+                                            if(fData.fx === 'chorus') chorus += fData.amount;
+                                        }
                                     };
+
+                                    if (Array.isArray(rowFx)) {
+                                        rowFx.forEach(addMemFx);
+                                    } else { // Backwards compatibility for older saves
+                                        crush += rowFx.crush || 0; echo += rowFx.echo || 0; reverb += rowFx.reverb || 0; chorus += rowFx.chorus || 0;
+                                    }
+                                    
+                                    if (Array.isArray(colData[r].cellFx)) {
+                                        colData[r].cellFx.forEach(addMemFx);
+                                    } else { // Backwards compatibility for older saves
+                                        crush += colData[r].cellFx.crush || 0; echo += colData[r].cellFx.echo || 0; reverb += colData[r].cellFx.reverb || 0; chorus += colData[r].cellFx.chorus || 0;
+                                    }
+
+                                    const fx = { crush, echo, reverb, chorus };
                                     this.audio.playNote(r, b.color, b.pitch, this.rowVolumes[r] * (b.volume || 1.0), fx, time, b.kit); 
                                 }); 
                             }

@@ -32,7 +32,7 @@ class AudioEngine {
         this.busCrush.connect(this.bitcrusher); this.bitcrusher.connect(this.masterCompressor);
 
         this.busEcho = this.ctx.createGain();
-        this.delay = this.ctx.createDelay(); 
+        this.delay = this.ctx.createDelay(2.0); this.delay.delayTime.value = 0.409;
         this.delayFeedback = this.ctx.createGain(); this.delayFeedback.gain.value = 0.5;
         this.delay.connect(this.delayFeedback); this.delayFeedback.connect(this.delay);
         this.busEcho.connect(this.delay); this.delay.connect(this.masterCompressor);
@@ -330,7 +330,9 @@ class AudioEngine {
 
     _routeSignal(sourceNode, fx) {
         const c = fx.crush || 0; const e = fx.echo || 0; const r = fx.reverb || 0; const h = fx.chorus || 0;
-        const dryLvl = Math.max(0, 1 - (c + e + r + h));
+        
+        // Crush is an insert effect (replaces dry signal). Echo, Reverb, and Chorus are parallel sends (added to dry).
+        const dryLvl = Math.max(0, 1 - c);
 
         const dryG = this.ctx.createGain(); dryG.gain.value = dryLvl; sourceNode.connect(dryG); dryG.connect(this.busDry);
         const crushG = this.ctx.createGain(); crushG.gain.value = c; sourceNode.connect(crushG); crushG.connect(this.busCrush);
