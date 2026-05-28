@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Project Noctiluca - Key, Scale, and Rhythm</title>
+    <title>JamBoard</title>
     <style>
         :root {
             --bg: #111; --grid-bg: #222;
@@ -13,7 +13,9 @@
         #controls { margin-bottom: 10px; display: flex; gap: 15px; flex-wrap: wrap; justify-content: center; width: 100%; max-width: 1100px; align-items: center; }
         button { padding: 10px 20px; background: #444; color: #fff; border: none; cursor: pointer; font-family: monospace; font-size: 14px; border-radius: 4px; font-weight: bold; }
         button:hover { background: #666; }
+        button:disabled { background: #222; color: #555; cursor: not-allowed; }
         #btn-play-grid { background: var(--green); color: #000; }
+        #btn-play-grid:disabled { background: #1a4d29; color: #555; }
         #btn-play-song { background: var(--yellow); color: #000; }
         #btn-stop { background: var(--red); color: #fff; }
         #btn-kit { background: var(--blue); color: #000; }
@@ -22,18 +24,16 @@
         .highlight { color: #fff; }
         
         #main-workspace { display: flex; gap: 30px; width: 100%; max-width: 1200px; justify-content: center; align-items: flex-start; }
+        #main-workspace.locked { pointer-events: none; opacity: 0.7; }
         #left-panel { display: flex; flex-direction: column; align-items: center; width: 100%;}
         
-        /* Palette */
         #palette { display: flex; gap: 15px; flex-wrap: wrap; margin-bottom: 20px; padding: 15px; background: var(--grid-bg); border-radius: 8px; align-items: center; justify-content: center; width: 100%; box-sizing: border-box;}
         .palette-divider { width: 2px; height: 30px; background: #444; margin: 0 5px; }
         
-        /* Musical Theory & Rhythm Selectors */
         .theory-controls { display: flex; gap: 10px; align-items: center; }
         .theory-controls select { background: #111; color: var(--yellow); border: 2px solid #555; padding: 6px 10px; border-radius: 4px; font-family: monospace; font-weight: bold; font-size: 12px; cursor: pointer; text-transform: uppercase; outline: none; transition: 0.1s;}
         .theory-controls select:hover { border-color: #888; }
         
-        /* Block Architecture */
         .block { width: 50px; height: 50px; cursor: grab; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-weight: bold; color: #000; user-select: none; box-shadow: 0 4px 10px rgba(0,0,0,0.5); overflow: hidden; position: relative; border: 3px solid transparent; box-sizing: border-box; transition: border-color 0.1s;}
         .block.dragging { opacity: 0.5; }
         .block[data-color="red"] { background: var(--red); }
@@ -45,52 +45,56 @@
         .block .pitch-val { position: relative; z-index: 2; pointer-events: none;}
         .block .vol-bar { position: absolute; bottom: 0; left: 0; width: 100%; background: rgba(0,0,0,0.25); z-index: 1; transition: height 0.1s; pointer-events: none;}
 
-        /* FX Token Architecture */
         .fx-token { width: 45px; height: 20px; border-radius: 4px; color: #fff; font-size: 9px; font-weight: bold; display: flex; justify-content: center; align-items: center; cursor: grab; border: 2px solid #888; box-shadow: 0 2px 5px rgba(0,0,0,0.5); user-select: none; position: relative; overflow: hidden;}
         .fx-token.dragging { opacity: 0.5; }
         .fx-token[data-fx="crush"] { background: #522; border-color: #f66; }
         .fx-token[data-fx="echo"] { background: #225; border-color: #66f; }
+        .fx-token[data-fx="reverb"] { background: #552; border-color: #aa4; }
+        .fx-token[data-fx="chorus"] { background: #255; border-color: #4aa; }
         .fx-token .fx-label { position: relative; z-index: 2; pointer-events: none;}
         .fx-bar { position: absolute; bottom: 0; left: 0; width: 100%; background: rgba(255,255,255,0.3); z-index: 1; pointer-events: none; transition: height 0.1s; }
         
-        /* Grid Layout */
         #grid { display: grid; grid-template-columns: 100px repeat(8, 70px) 70px; grid-template-rows: repeat(5, minmax(85px, auto)); gap: 5px; padding: 15px; border-radius: 12px; transition: background-color 0.1s ease-out; background-color: transparent; }
         .row-controls { display: flex; flex-direction: column; align-items: flex-end; justify-content: center; padding-right: 15px; gap: 5px; }
         .row-label { font-size: 12px; color: #ccc; font-weight: bold; text-transform: uppercase; }
         .row-volume { width: 70px; cursor: pointer; accent-color: var(--green); }
         
-        /* Main Grid Cells */
         .cell { background: var(--grid-bg); border: 1px solid #333; border-radius: 4px; display: flex; flex-direction: column-reverse; align-items: center; justify-content: flex-start; padding: 5px 18px; gap: 2px; position: relative; }
         .cell.active { background: var(--active-col); }
         
         .cell .block { width: 100%; height: 20px; cursor: pointer; font-size: 10px; position: relative; z-index: 2;}
         
-        /* Cell FX Modifiers (Inline) */
-        .cell .fx-token { position: absolute; top: 50%; transform: translateY(-50%); width: 12px; height: 80%; max-height: 60px; z-index: 1; color: transparent; border-radius: 2px; border-width: 1px;}
+        .cell .fx-token { position: absolute; width: 12px; height: 35px; z-index: 1; color: transparent; border-radius: 2px; border-width: 1px;}
         .cell .fx-token .fx-label { display: none; }
-        .cell .fx-token[data-fx="crush"] { left: 3px; }
+        .cell .fx-token[data-fx="crush"] { left: 3px; top: 5px; }
+        .cell .fx-token[data-fx="echo"] { left: 3px; bottom: 5px; }
+        .cell .fx-token[data-fx="reverb"] { right: 3px; top: 5px; }
+        .cell .fx-token[data-fx="chorus"] { right: 3px; bottom: 5px; }
         .cell .fx-token[data-fx="crush"]::after { content: "C"; color: #fff; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 2;}
-        .cell .fx-token[data-fx="echo"] { right: 3px; }
         .cell .fx-token[data-fx="echo"]::after { content: "E"; color: #fff; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 2;}
+        .cell .fx-token[data-fx="reverb"]::after { content: "R"; color: #fff; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 2;}
+        .cell .fx-token[data-fx="chorus"]::after { content: "H"; color: #fff; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 2;}
         
-        /* Row Master FX Slots */
-        .row-fx-slot { background: #1a1a1a; border: 2px dashed #444; border-radius: 4px; display: flex; flex-direction: column-reverse; align-items: center; justify-content: center; gap: 4px; padding: 5px; position: relative; }
+        .row-fx-slot { background: #1a1a1a; border: 2px solid #444; border-radius: 4px; display: flex; flex-direction: column-reverse; align-items: center; justify-content: flex-start; gap: 4px; padding: 5px; position: relative; }
         .row-fx-slot::before { content: "ROW FX"; position: absolute; top: -15px; font-size: 9px; color: #666; font-weight: bold; width: 100%; text-align: center; }
 
-        /* Bank & Timeline */
         #right-panel { display: flex; flex-direction: column; gap: 20px; width: 250px; }
-        .panel-box { background: var(--grid-bg); border: 1px solid #444; border-radius: 8px; padding: 15px; height: 100%; display: flex; flex-direction: column;}
+        .panel-box { background: var(--grid-bg); border: 1px solid #444; border-radius: 8px; padding: 15px; display: flex; flex-direction: column;}
         .panel-title { font-size: 12px; color: #888; margin-bottom: 10px; text-transform: uppercase; }
-        #loop-bank { display: flex; flex-wrap: wrap; gap: 10px; overflow-y: auto; align-content: flex-start; flex-grow: 1; min-height: 200px; }
+        #loop-bank { display: flex; flex-wrap: wrap; gap: 10px; overflow-y: auto; align-content: flex-start; min-height: 150px; }
+        #song-bank { display: flex; flex-wrap: wrap; gap: 10px; overflow-y: auto; align-content: flex-start; min-height: 150px; }
         
         .loop-token { width: 50px; height: 50px; background: #111; border-radius: 4px; display: flex; gap: 2px; padding: 4px; cursor: grab; border: 2px solid #555; overflow: hidden; transition: transform 0.1s; user-select: none; }
         .loop-token:hover { transform: scale(1.05); }
         .mini-col { display: flex; flex-direction: column-reverse; flex: 1; gap: 1px; justify-content: flex-start; }
         .mini-block { width: 100%; height: 4px; border-radius: 1px; }
+
+        .song-token { width: 50px; height: 50px; background: var(--yellow); color: #000; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-weight: bold; cursor: pointer; border: 2px solid #fff; user-select: none; transition: 0.1s;}
+        .song-token:hover { transform: scale(1.05); }
         
         #bottom-panel { width: 100%; max-width: 1200px; margin-top: 20px; }
-        #timeline { display: flex; gap: 10px; overflow-x: auto; padding: 15px; background: var(--grid-bg); border-radius: 8px; min-height: 60px; border: 1px solid #444; }
-        .timeline-slot { width: 60px; height: 60px; flex-shrink: 0; border: 2px dashed #555; border-radius: 4px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.1s; }
+        .timeline-row { display: flex; gap: 10px; overflow-x: auto; padding: 15px; background: var(--grid-bg); border-radius: 8px; min-height: 60px; border: 1px solid #444; }
+        .timeline-slot { width: 60px; height: 60px; flex-shrink: 0; border: 2px solid #555; border-radius: 4px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.1s; }
         .timeline-slot:hover { border-color: #888; background: rgba(255,255,255,0.05); }
         .timeline-slot.active-macro { border-color: var(--yellow); background: rgba(255, 204, 0, 0.15); border-style: solid;}
         .timeline-slot .loop-token { width: 100%; height: 100%; border: none; padding: 2px; }
@@ -105,18 +109,23 @@
         <button id="btn-kit">ACTIVE KIT: TECHNO</button>
         <button id="btn-clear">CLEAR GRID</button>
         <button id="btn-save">SAVE LOOP</button>
-        <div class="slider-container"><label for="bpm-slider">BPM: <span id="bpm-display">110</span></label><input type="range" id="bpm-slider" min="60" max="200" value="110"></div>
+        <button id="btn-save-new" style="display: none; background: var(--blue); color: #000;">SAVE AS NEW</button>
+        <div class="slider-container">
+            <label for="bpm-slider">BPM: <span id="bpm-display">110</span></label>
+            <input type="range" id="bpm-slider" min="60" max="200" value="110">
+        </div>
     </div>
     
     <div class="instructions">
-        <span class="highlight">PITCH:</span> Click/Scroll on Blocks &nbsp;|&nbsp;
-        <span class="highlight">VOL / FX MIX:</span> Ctrl + Scroll/Click on Blocks or Tokens &nbsp;|&nbsp;
+        <span class="highlight">PITCH:</span> Click/Scroll on Blocks *
+        <span class="highlight">VOL / FX MIX:</span> Scroll/Click on Blocks or Tokens *
         <span class="highlight">REMOVE:</span> Shift-Click or Drag
     </div>
 
     <div id="main-workspace">
         <div id="left-panel">
             <div id="palette">
+                
                 <div class="block" draggable="true" data-type="block" data-color="red"><span class="pitch-val">R</span></div>
                 <div class="block" draggable="true" data-type="block" data-color="yellow"><span class="pitch-val">Y</span></div>
                 <div class="block" draggable="true" data-type="block" data-color="blue"><span class="pitch-val">B</span></div>
@@ -131,23 +140,23 @@
                 <div class="fx-token" draggable="true" data-type="fx" data-fx="echo" data-amount="1.0">
                     <div class="fx-bar" style="height: 100%"></div><span class="fx-label">ECHO</span>
                 </div>
+                <div class="fx-token" draggable="true" data-type="fx" data-fx="reverb" data-amount="1.0">
+                    <div class="fx-bar" style="height: 100%"></div><span class="fx-label">REVERB</span>
+                </div>
+                <div class="fx-token" draggable="true" data-type="fx" data-fx="chorus" data-amount="1.0">
+                    <div class="fx-bar" style="height: 100%"></div><span class="fx-label">CHORUS</span>
+                </div>
 
                 <div class="palette-divider"></div>
 
                 <div class="theory-controls">
                     <select id="sel-key">
-                        <option value="60">C</option>
-                        <option value="61">C#</option>
-                        <option value="62">D</option>
-                        <option value="63">D#</option>
-                        <option value="64">E</option>
-                        <option value="65">F</option>
-                        <option value="66">F#</option>
-                        <option value="67">G</option>
-                        <option value="68">G#</option>
-                        <option value="69">A</option>
-                        <option value="70">A#</option>
-                        <option value="71">B</option>
+                        <option value="60">C</option><option value="61">Db / C#</option>
+                        <option value="62">D</option><option value="63">Eb / D#</option>
+                        <option value="64">E</option><option value="65">F</option>
+                        <option value="66">Gb / F#</option><option value="67">G</option>
+                        <option value="68">Ab / G#</option><option value="69">A</option>
+                        <option value="70">Bb / A#</option><option value="71">B</option>
                     </select>
                     <select id="sel-scale">
                         <option value="MINOR PENT">Min Pent</option>
@@ -167,570 +176,29 @@
         </div>
         <div id="right-panel">
             <div class="panel-box"><div class="panel-title">Loop Bank</div><div id="loop-bank"></div></div>
+            <div class="panel-box"><div class="panel-title">Song Bank</div><div id="song-bank"></div></div>
         </div>
     </div>
 
     <div id="bottom-panel">
-        <div class="panel-title" style="margin-left: 5px;">Song Timeline</div>
-        <div id="timeline"></div>
-        <button id="btn-clear-song" style="margin-top: 10px;">CLEAR TIMELINE</button>
+        <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 10px;">
+            <div class="panel-title" style="margin-left: 5px; margin-bottom: 0;">Song Timelines</div>
+            <div style="display: flex; gap: 10px;">
+                <button id="btn-add-timeline" style="background: var(--blue); color: #000; padding: 5px 10px;">+ TIMELINE</button>
+                <button id="btn-remove-timeline" style="background: var(--red); padding: 5px 10px;">- TIMELINE</button>
+            </div>
+        </div>
+        
+        <div id="timeline-container" style="display: flex; flex-direction: column; gap: 5px;"></div>
+        
+        <div style="margin-top: 15px; display: flex; gap: 10px;">
+            <button id="btn-save-song" style="background: var(--purple); color: #fff;">SAVE SONG</button>
+            <button id="btn-clear-song">CLEAR TIMELINES</button>
+        </div>
     </div>
 
-<script>
-const ctx = new (window.AudioContext || window.webkitAudioContext)();
-let BPM = 110; let stepTime = 60 / BPM / 2;
-const KITS = ['TECHNO', '8-BIT', 'AMBIENT', 'RETRO-WAVE', 'GLITCH-HOP', 'DEEP-DUB'];
-let activeKitIndex = 0;
+    <script src="audioEngine.js"></script>
+    <script src="app.js"></script>
 
-document.getElementById('btn-kit').addEventListener('click', (e) => { 
-    activeKitIndex = (activeKitIndex + 1) % KITS.length; 
-    e.target.innerText = `ACTIVE KIT: ${KITS[activeKitIndex]}`; 
-});
-
-// --- DYNAMIC MUSIC THEORY ENGINE ---
-const SCALES = {
-    'PENTATONIC': [0, 2, 4, 7, 9],
-    'MINOR PENT': [0, 3, 5, 7, 10],
-    'MAJOR': [0, 2, 4, 5, 7, 9, 11],
-    'MINOR': [0, 2, 3, 5, 7, 8, 10],
-    'BLUES': [0, 3, 5, 6, 7, 10]
-};
-
-let activeKey = 60; // Middle C
-let activeScale = 'MINOR PENT';
-let activeRhythm = 'STRAIGHT';
-
-document.getElementById('sel-key').addEventListener('change', (e) => { activeKey = parseInt(e.target.value); });
-document.getElementById('sel-scale').addEventListener('change', (e) => { activeScale = e.target.value; });
-document.getElementById('sel-rhythm').addEventListener('change', (e) => { activeRhythm = e.target.value; });
-
-function getFreq(pitchIdx) {
-    const intervals = SCALES[activeScale];
-    let octaves = Math.floor(pitchIdx / intervals.length);
-    let step = pitchIdx % intervals.length;
-    if (step < 0) step += intervals.length; 
-    let midiNote = activeKey + (octaves * 12) + intervals[step];
-    return 440 * Math.pow(2, (midiNote - 69) / 12);
-}
-
-// --- DYNAMIC AUDIO BUS ROUTING ---
-const masterCompressor = ctx.createDynamicsCompressor();
-masterCompressor.threshold.value = -3; 
-masterCompressor.knee.value = 20; 
-masterCompressor.ratio.value = 4; 
-masterCompressor.attack.value = 0.005; 
-masterCompressor.release.value = 0.15;
-const masterGain = ctx.createGain(); masterGain.gain.value = 0.9;
-masterCompressor.connect(masterGain); masterGain.connect(ctx.destination);
-
-const busDry = ctx.createGain(); busDry.connect(masterCompressor);
-
-const busCrush = ctx.createGain();
-const bitcrusher = ctx.createWaveShaper(); bitcrusher.oversample = 'none';
-function makeCrushCurve(amount) {
-    const n_samples = 44100; const curve = new Float32Array(n_samples); const deg = Math.PI / 180;
-    for (let i = 0; i < n_samples; ++i) { let x = i * 2 / n_samples - 1; curve[i] = (3 + amount) * x * 20 * deg / (Math.PI + amount * Math.abs(x)); } return curve;
-}
-bitcrusher.curve = makeCrushCurve(200);
-busCrush.connect(bitcrusher); bitcrusher.connect(masterCompressor);
-
-const busEcho = ctx.createGain();
-const delay = ctx.createDelay(); delay.delayTime.value = stepTime * 1.5;
-const delayFeedback = ctx.createGain(); delayFeedback.gain.value = 0.5;
-delay.connect(delayFeedback); delayFeedback.connect(delay);
-busEcho.connect(delay); delay.connect(masterCompressor);
-busEcho.connect(masterCompressor); 
-
-const busBoth = ctx.createGain();
-const bothCrusher = ctx.createWaveShaper(); bothCrusher.curve = makeCrushCurve(200);
-const bothDelay = ctx.createDelay(); bothDelay.delayTime.value = stepTime * 1.5;
-const bothFeedback = ctx.createGain(); bothFeedback.gain.value = 0.5;
-bothDelay.connect(bothFeedback); bothFeedback.connect(bothDelay);
-busBoth.connect(bothCrusher); bothCrusher.connect(bothDelay); bothDelay.connect(masterCompressor);
-bothCrusher.connect(masterCompressor); 
-
-const rows = ['Rhythm', 'Bass', 'Melody', 'FX', 'Vocals'];
-const STEPS = 8; const MAX_TIMELINE_SLOTS = 16;
-let playbackMode = 'STOPPED'; let currentStep = 0; let nextNoteTime = 0; let timerID;
-const loopMemory = []; let currentMacroStep = 0; let activeSongLoop = -1; let rowVolumes = [1, 1, 1, 1, 1];
-
-document.getElementById('bpm-slider').addEventListener('input', (e) => { 
-    BPM = e.target.value; document.getElementById('bpm-display').innerText = BPM; stepTime = 60 / BPM / 2; 
-    delay.delayTime.value = stepTime * 1.5; bothDelay.delayTime.value = stepTime * 1.5;
-});
-
-// --- UI SETUP ---
-const gridEl = document.getElementById('grid'); const cells = [];
-for (let r = 0; r < rows.length; r++) {
-    const controls = document.createElement('div'); controls.className = 'row-controls';
-    const label = document.createElement('div'); label.className = 'row-label'; label.innerText = rows[r];
-    const volSlider = document.createElement('input'); volSlider.type = 'range'; volSlider.className = 'row-volume'; volSlider.min = '0'; volSlider.max = '1'; volSlider.step = '0.05'; volSlider.value = '1';
-    volSlider.addEventListener('input', e => { rowVolumes[r] = parseFloat(e.target.value); });
-    controls.appendChild(label); controls.appendChild(volSlider); gridEl.appendChild(controls);
-    
-    cells[r] = [];
-    for (let c = 0; c < STEPS; c++) {
-        const cell = document.createElement('div'); cell.className = 'cell'; cell.dataset.row = r; cell.dataset.col = c; 
-        gridEl.appendChild(cell); cells[r].push(cell);
-        cell.addEventListener('dragover', e => e.preventDefault()); cell.addEventListener('drop', e => handleGridDrop(e, cell));
-    }
-    
-    const fxSlot = document.createElement('div'); fxSlot.className = 'row-fx-slot'; fxSlot.dataset.row = r;
-    gridEl.appendChild(fxSlot);
-    fxSlot.addEventListener('dragover', e => e.preventDefault()); fxSlot.addEventListener('drop', e => handleGridDrop(e, fxSlot));
-}
-
-const timelineEl = document.getElementById('timeline'); const timelineSlots = [];
-for(let i=0; i < MAX_TIMELINE_SLOTS; i++) { 
-    const slot = document.createElement('div'); slot.className = 'timeline-slot'; slot.dataset.index = i;
-    timelineEl.appendChild(slot); timelineSlots.push(slot); 
-}
-
-// --- DRAG AND DROP ENGINE ---
-document.querySelectorAll('#palette > div[draggable="true"]').forEach(el => { 
-    el.addEventListener('dragstart', e => { 
-        e.dataTransfer.setData('source', 'palette'); e.dataTransfer.setData('type', el.dataset.type);
-        if (el.dataset.type === 'block') { e.dataTransfer.setData('color', el.dataset.color); } 
-        else { e.dataTransfer.setData('fx', el.dataset.fx); }
-    }); 
-});
-
-function updateBlockVisuals(block, v) {
-    const fillRatio = Math.min(1.0, v);
-    block.querySelector('.vol-bar').style.height = `${fillRatio * 100}%`;
-    
-    const overdrive = Math.max(0, v - 1.0); 
-    if (overdrive > 0) {
-        const g = Math.floor(255 * (1 - overdrive));
-        block.style.borderColor = `rgb(255, ${g}, 0)`;
-    } else {
-        block.style.borderColor = 'transparent';
-    }
-}
-
-function createBlockDOM(color, pitch, volume = 1.0) {
-    const block = document.createElement('div'); block.className = 'block'; 
-    block.dataset.type = 'block'; block.dataset.color = color; 
-    block.dataset.pitch = pitch; block.dataset.volume = volume; 
-    block.draggable = true;
-    
-    block.innerHTML = `<span class="pitch-val">${pitch}</span><div class="vol-bar"></div>`;
-    updateBlockVisuals(block, volume);
-    
-    block.addEventListener('click', (e) => { 
-        if (e.shiftKey) { block.remove(); return; } 
-        if (e.ctrlKey || e.metaKey) {
-            let v = parseFloat(block.dataset.volume);
-            v = v - 0.25; if(v < 0) v = 2.0;
-            block.dataset.volume = v.toFixed(2);
-            updateBlockVisuals(block, v);
-            return;
-        }
-        let p = parseInt(block.dataset.pitch); p = p === 4 ? -4 : p + 1; 
-        block.dataset.pitch = p; block.querySelector('.pitch-val').innerText = p; 
-    });
-    
-    block.addEventListener('contextmenu', (e) => { 
-        e.preventDefault(); 
-        if (e.ctrlKey || e.metaKey) return; 
-        let p = parseInt(block.dataset.pitch); p = p === -4 ? 4 : p - 1; 
-        block.dataset.pitch = p; block.querySelector('.pitch-val').innerText = p; 
-    });
-    
-    block.addEventListener('wheel', (e) => { 
-        if (e.ctrlKey || e.metaKey) {
-            e.preventDefault(); 
-            let v = parseFloat(block.dataset.volume);
-            v = e.deltaY < 0 ? Math.min(2.0, v + 0.1) : Math.max(0, v - 0.1);
-            block.dataset.volume = v.toFixed(2);
-            updateBlockVisuals(block, v);
-            return;
-        }
-        e.preventDefault(); 
-        let p = parseInt(block.dataset.pitch); p = e.deltaY < 0 ? (p === 4 ? -4 : p + 1) : (p === -4 ? 4 : p - 1); 
-        block.dataset.pitch = p; block.querySelector('.pitch-val').innerText = p; 
-    }, { passive: false });
-    
-    block.addEventListener('dragstart', e => { e.dataTransfer.setData('source', 'grid'); e.dataTransfer.setData('type', 'block'); setTimeout(() => block.classList.add('dragging'), 0); });
-    block.addEventListener('dragend', () => block.classList.remove('dragging')); 
-    return block;
-}
-
-function createFxDOM(fxType, amount = 1.0) {
-    const token = document.createElement('div'); token.className = 'fx-token'; token.dataset.type = 'fx'; token.dataset.fx = fxType; token.dataset.amount = amount; token.draggable = true;
-    
-    token.innerHTML = `<div class="fx-bar" style="height: ${amount * 100}%"></div><span class="fx-label">${fxType.toUpperCase()}</span>`;
-    
-    token.addEventListener('click', (e) => { 
-        if (e.shiftKey) { token.remove(); return; } 
-        if (e.ctrlKey || e.metaKey) {
-            let a = parseFloat(token.dataset.amount);
-            a = a - 0.25; if(a < 0) a = 1.0;
-            token.dataset.amount = a.toFixed(2);
-            token.querySelector('.fx-bar').style.height = `${a * 100}%`;
-        }
-    });
-    
-    token.addEventListener('wheel', (e) => { 
-        if (e.ctrlKey || e.metaKey) {
-            e.preventDefault(); 
-            let a = parseFloat(token.dataset.amount);
-            a = e.deltaY < 0 ? Math.min(1.0, a + 0.1) : Math.max(0, a - 0.1);
-            token.dataset.amount = a.toFixed(2);
-            token.querySelector('.fx-bar').style.height = `${a * 100}%`;
-        }
-    }, { passive: false });
-    
-    token.addEventListener('dragstart', e => { e.dataTransfer.setData('source', 'grid'); e.dataTransfer.setData('type', 'fx'); setTimeout(() => token.classList.add('dragging'), 0); });
-    token.addEventListener('dragend', () => token.classList.remove('dragging')); return token;
-}
-
-function handleGridDrop(e, target) { 
-    e.preventDefault(); e.stopPropagation();
-    const source = e.dataTransfer.getData('source'); const type = e.dataTransfer.getData('type');
-    const dragging = document.querySelector('.dragging');
-    
-    if (source === 'grid' && dragging) {
-        if (target.classList.contains('cell')) {
-            if (type === 'fx') { 
-                const existingFx = target.querySelector(`.fx-token[data-fx="${dragging.dataset.fx}"]`); 
-                if (existingFx && existingFx !== dragging) existingFx.remove(); 
-            } 
-            target.appendChild(dragging);
-        } else if (target.classList.contains('row-fx-slot') && type === 'fx') {
-            target.appendChild(dragging);
-        } return;
-    }
-
-    if (source === 'palette') {
-        if (target.classList.contains('cell')) {
-            if (type === 'block') {
-                target.appendChild(createBlockDOM(e.dataTransfer.getData('color'), 0, 1.0));
-            } else if (type === 'fx') {
-                const fxData = e.dataTransfer.getData('fx');
-                const existingFx = target.querySelector(`.fx-token[data-fx="${fxData}"]`); if (existingFx) existingFx.remove();
-                target.appendChild(createFxDOM(fxData, 1.0));
-            }
-        } else if (target.classList.contains('row-fx-slot') && type === 'fx') {
-            target.appendChild(createFxDOM(e.dataTransfer.getData('fx'), 1.0));
-        }
-    }
-}
-
-document.body.addEventListener('dragover', e => e.preventDefault());
-document.body.addEventListener('drop', e => {
-    if (e.dataTransfer.getData('source') === 'grid' && !e.target.closest('.cell') && !e.target.closest('.row-fx-slot')) {
-        const dragging = document.querySelector('.dragging'); if (dragging) { dragging.remove(); }
-    }
-});
-
-// --- AUDIO SYNTHESIS ENGINE ---
-const noiseBuffer = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
-const output = noiseBuffer.getChannelData(0); for (let i = 0; i < noiseBuffer.length; i++) { output[i] = Math.random() * 2 - 1; }
-function createNoise() { const n = ctx.createBufferSource(); n.buffer = noiseBuffer; return n; }
-const distortionCurve = new Float32Array(4096);
-for (let i = 0; i < 4096; i++) { const x = (i * 2) / 4096 - 1; distortionCurve[i] = Math.sign(x) * Math.pow(Math.abs(x), 0.5); }
-
-function playSound(row, color, pitchIdx, volume, cell, time) {
-    const kit = KITS[activeKitIndex]; 
-    const baseFreq = getFreq(pitchIdx); 
-    const finalVol = rowVolumes[row] * volume;
-    if (finalVol <= 0) return;
-
-    let crushAmount = 0; let echoAmount = 0;
-    const rowFxEls = document.querySelectorAll(`.row-fx-slot[data-row="${row}"] .fx-token`);
-    const blockFxEls = cell ? cell.querySelectorAll('.fx-token') : [];
-    
-    rowFxEls.forEach(el => { 
-        if(el.dataset.fx === 'crush') crushAmount = Math.max(crushAmount, parseFloat(el.dataset.amount)); 
-        if(el.dataset.fx === 'echo') echoAmount = Math.max(echoAmount, parseFloat(el.dataset.amount)); 
-    });
-    blockFxEls.forEach(el => { 
-        if(el.dataset.fx === 'crush') crushAmount = Math.max(crushAmount, parseFloat(el.dataset.amount)); 
-        if(el.dataset.fx === 'echo') echoAmount = Math.max(echoAmount, parseFloat(el.dataset.amount)); 
-    });
-
-    const osc = ctx.createOscillator(); const filter = ctx.createBiquadFilter(); const gain = ctx.createGain();
-    osc.detune.value = (Math.random() * 10) - 5; 
-    osc.connect(filter); filter.connect(gain);
-    
-    const dryGain = ctx.createGain(); dryGain.gain.value = (1 - crushAmount) * (1 - echoAmount);
-    const crushGain = ctx.createGain(); crushGain.gain.value = crushAmount * (1 - echoAmount);
-    const echoGain = ctx.createGain(); echoGain.gain.value = (1 - crushAmount) * echoAmount;
-    const bothGain = ctx.createGain(); bothGain.gain.value = crushAmount * echoAmount;
-    
-    gain.connect(dryGain); dryGain.connect(busDry);
-    gain.connect(crushGain); crushGain.connect(busCrush);
-    gain.connect(echoGain); echoGain.connect(busEcho);
-    gain.connect(bothGain); bothGain.connect(busBoth);
-
-    // --- ROW 0: RHYTHM ---
-    if (row === 0) { 
-        if (color === 'red') { 
-            if (kit === 'TECHNO') { osc.type = 'sine'; osc.frequency.setValueAtTime(150, time); osc.frequency.exponentialRampToValueAtTime(40, time+0.1); gain.gain.setValueAtTime(1.5*finalVol, time); gain.gain.exponentialRampToValueAtTime(0.01, time+0.4); osc.start(time); osc.stop(time+0.4); }
-            else if (kit === '8-BIT') { osc.type = 'square'; osc.frequency.setValueAtTime(80, time); osc.frequency.exponentialRampToValueAtTime(20, time+0.2); gain.gain.setValueAtTime(1*finalVol, time); gain.gain.setValueAtTime(1*finalVol, time+0.1); gain.gain.linearRampToValueAtTime(0, time+0.15); osc.start(time); osc.stop(time+0.15); }
-            else if (kit === 'RETRO-WAVE') { osc.type = 'sine'; osc.frequency.setValueAtTime(150, time); osc.frequency.exponentialRampToValueAtTime(0.01, time+0.3); gain.gain.setValueAtTime(1.2*finalVol, time); gain.gain.exponentialRampToValueAtTime(0.01, time+0.3); osc.start(time); osc.stop(time+0.3); }
-            else if (kit === 'GLITCH-HOP') { osc.type = 'sawtooth'; filter.type = 'lowpass'; filter.frequency.setValueAtTime(1000, time); filter.frequency.exponentialRampToValueAtTime(50, time+0.2); osc.frequency.setValueAtTime(120, time); osc.frequency.exponentialRampToValueAtTime(20, time+0.2); gain.gain.setValueAtTime(1*finalVol, time); gain.gain.exponentialRampToValueAtTime(0.01, time+0.2); osc.start(time); osc.stop(time+0.2); }
-            else if (kit === 'DEEP-DUB') { osc.type = 'sine'; osc.frequency.setValueAtTime(60 + (pitchIdx*5), time); osc.frequency.exponentialRampToValueAtTime(40, time+0.6); gain.gain.setValueAtTime(1*finalVol, time); gain.gain.linearRampToValueAtTime(0, time+0.8); osc.start(time); osc.stop(time+0.8); }
-            else { osc.type = 'sine'; osc.frequency.setValueAtTime(130, time); osc.frequency.exponentialRampToValueAtTime(0.01, time+0.4); gain.gain.setValueAtTime(1*finalVol, time); gain.gain.exponentialRampToValueAtTime(0.01, time+0.4); osc.start(time); osc.stop(time+0.4); }
-        }
-        else if (color === 'yellow') { 
-            const n = createNoise(); n.connect(filter); filter.connect(gain);
-            if (kit === 'TECHNO') { filter.type = 'bandpass'; filter.frequency.value = 2500; gain.gain.setValueAtTime(1.2*finalVol, time); gain.gain.exponentialRampToValueAtTime(0.01, time+0.2); n.start(time); n.stop(time+0.2); }
-            else if (kit === '8-BIT') { filter.type = 'lowpass'; filter.frequency.value = 4000; gain.gain.setValueAtTime(0.8*finalVol, time); gain.gain.setValueAtTime(0.8*finalVol, time+0.05); gain.gain.linearRampToValueAtTime(0, time+0.1); n.start(time); n.stop(time+0.1); }
-            else if (kit === 'RETRO-WAVE') { filter.type = 'lowpass'; filter.frequency.value = 5000; gain.gain.setValueAtTime(0.8*finalVol, time); gain.gain.setValueAtTime(0.8*finalVol, time+0.1); gain.gain.exponentialRampToValueAtTime(0.01, time+0.15); n.start(time); n.stop(time+0.15); }
-            else if (kit === 'GLITCH-HOP') { filter.type = 'highpass'; filter.frequency.value = 1000; osc.type='triangle'; osc.frequency.setValueAtTime(300, time); osc.frequency.exponentialRampToValueAtTime(100, time+0.1); gain.gain.setValueAtTime(0.8*finalVol, time); gain.gain.exponentialRampToValueAtTime(0.01, time+0.2); osc.start(time); osc.stop(time+0.2); n.start(time); n.stop(time+0.1); }
-            else if (kit === 'DEEP-DUB') { filter.type = 'bandpass'; filter.frequency.value = 1200; filter.Q.value = 5; gain.gain.setValueAtTime(0.8*finalVol, time); gain.gain.exponentialRampToValueAtTime(0.01, time+0.1); n.start(time); n.stop(time+0.1); }
-            else { filter.type = 'lowpass'; filter.frequency.value = kit==='AMBIENT'?1000:8000; gain.gain.setValueAtTime(0.5*finalVol, time); gain.gain.exponentialRampToValueAtTime(0.01, time+0.1); osc.type = kit==='AMBIENT'?'sine':'square'; osc.frequency.setValueAtTime(600, time); osc.start(time); osc.stop(time+0.1); }
-        }
-        else if (color === 'blue') { 
-            const n = createNoise(); n.connect(filter); filter.connect(gain);
-            if (kit === 'TECHNO') { filter.type = 'highpass'; filter.frequency.value = 6000; gain.gain.setValueAtTime(0.6*finalVol, time); gain.gain.exponentialRampToValueAtTime(0.01, time+0.05); n.start(time); n.stop(time+0.05); }
-            else if (kit === '8-BIT') { filter.type = 'bandpass'; filter.frequency.value = 3000; filter.Q.value = 1; gain.gain.setValueAtTime(0.5*finalVol, time); gain.gain.setValueAtTime(0.5*finalVol, time+0.03); gain.gain.linearRampToValueAtTime(0, time+0.05); n.start(time); n.stop(time+0.05); }
-            else if (kit === 'RETRO-WAVE') { filter.type = 'highpass'; filter.frequency.value = 8000; gain.gain.setValueAtTime(0.4*finalVol, time); gain.gain.exponentialRampToValueAtTime(0.01, time+0.05); n.start(time); n.stop(time+0.05); }
-            else if (kit === 'GLITCH-HOP') { const ws = ctx.createWaveShaper(); ws.curve = distortionCurve; n.disconnect(); n.connect(ws); ws.connect(filter); filter.type = 'highpass'; filter.frequency.value = 4000; gain.gain.setValueAtTime(0.5*finalVol, time); gain.gain.exponentialRampToValueAtTime(0.01, time+0.1); n.start(time); n.stop(time+0.1); }
-            else if (kit === 'DEEP-DUB') { filter.type = 'bandpass'; filter.frequency.value = 6000; filter.Q.value = 1; gain.gain.setValueAtTime(0, time); gain.gain.linearRampToValueAtTime(0.4*finalVol, time+0.05); gain.gain.linearRampToValueAtTime(0, time+0.15); n.start(time); n.stop(time+0.15); }
-            else { osc.type = 'sawtooth'; osc.frequency.setValueAtTime(4000, time); filter.type='highpass'; filter.frequency.value=6000; gain.gain.setValueAtTime(0.3*finalVol, time); gain.gain.exponentialRampToValueAtTime(0.01, time+0.05); osc.start(time); osc.stop(time+0.05); }
-        }
-        else if (color === 'green') { 
-            const n = createNoise(); n.connect(filter); filter.connect(gain);
-            if (kit === 'TECHNO') { filter.type = 'highpass'; filter.frequency.value = 4000; gain.gain.setValueAtTime(0.5*finalVol, time); gain.gain.exponentialRampToValueAtTime(0.01, time+0.6); n.start(time); n.stop(time+0.6); } 
-            else if (kit === '8-BIT') { filter.type = 'bandpass'; filter.frequency.value = 1500; filter.Q.value = 2; gain.gain.setValueAtTime(0.6*finalVol, time); gain.gain.setValueAtTime(0, time+0.1); gain.gain.setValueAtTime(0.4*finalVol, time+0.15); gain.gain.linearRampToValueAtTime(0, time+0.3); n.start(time); n.stop(time+0.3); } 
-            else if (kit === 'AMBIENT') { filter.type = 'bandpass'; filter.frequency.setValueAtTime(200, time); filter.frequency.linearRampToValueAtTime(2000, time+2.0); gain.gain.setValueAtTime(0, time); gain.gain.linearRampToValueAtTime(0.3*finalVol, time+1.0); gain.gain.linearRampToValueAtTime(0, time+3.0); n.start(time); n.stop(time+3.0); } 
-            else if (kit === 'RETRO-WAVE') { filter.type = 'highpass'; filter.frequency.value = 6000; gain.gain.setValueAtTime(0.6*finalVol, time); gain.gain.setValueAtTime(0.6*finalVol, time+0.2); gain.gain.linearRampToValueAtTime(0.01, time+0.25); n.start(time); n.stop(time+0.25); } 
-            else if (kit === 'GLITCH-HOP') { filter.type = 'lowpass'; filter.frequency.setValueAtTime(8000, time); filter.frequency.exponentialRampToValueAtTime(500, time+0.1); filter.Q.value = 15; gain.gain.setValueAtTime(0.6*finalVol, time); gain.gain.exponentialRampToValueAtTime(0.01, time+0.15); n.start(time); n.stop(time+0.15); } 
-            else if (kit === 'DEEP-DUB') { filter.type = 'lowpass'; filter.frequency.value = 3000; gain.gain.setValueAtTime(0.5*finalVol, time); gain.gain.exponentialRampToValueAtTime(0.01, time+0.8); n.start(time); n.stop(time+0.8); }
-        }
-        else if (color === 'purple') { 
-            if (kit === 'TECHNO') { osc.type = 'sawtooth'; filter.type = 'lowpass'; filter.frequency.setValueAtTime(3000, time); filter.frequency.exponentialRampToValueAtTime(200, time+0.1); osc.frequency.setValueAtTime(100, time); gain.gain.setValueAtTime(0.6*finalVol, time); gain.gain.exponentialRampToValueAtTime(0.01, time+0.2); osc.start(time); osc.stop(time+0.2); }
-            else if (kit === '8-BIT') { osc.type = 'square'; osc.frequency.setValueAtTime(200, time); osc.frequency.setValueAtTime(150, time+0.05); osc.frequency.setValueAtTime(100, time+0.1); gain.gain.setValueAtTime(0.6*finalVol, time); gain.gain.linearRampToValueAtTime(0, time+0.15); osc.start(time); osc.stop(time+0.15); }
-            else if (kit === 'RETRO-WAVE') { osc.type = 'square'; filter.type = 'lowpass'; filter.frequency.setValueAtTime(2000, time); filter.frequency.exponentialRampToValueAtTime(100, time+0.2); osc.frequency.setValueAtTime(200, time); osc.frequency.exponentialRampToValueAtTime(50, time+0.2); gain.gain.setValueAtTime(0.6*finalVol, time); gain.gain.exponentialRampToValueAtTime(0.01, time+0.2); osc.start(time); osc.stop(time+0.2); }
-            else if (kit === 'GLITCH-HOP') { osc.type = 'sawtooth'; osc.frequency.setValueAtTime(800, time); osc.frequency.setValueAtTime(200, time+0.05); osc.frequency.setValueAtTime(800, time+0.1); gain.gain.setValueAtTime(0.5*finalVol, time); gain.gain.linearRampToValueAtTime(0, time+0.15); osc.start(time); osc.stop(time+0.15); }
-            else if (kit === 'DEEP-DUB') { osc.type = 'sine'; osc.frequency.setValueAtTime(100, time); osc.frequency.linearRampToValueAtTime(30, time+1.0); gain.gain.setValueAtTime(0.8*finalVol, time); gain.gain.linearRampToValueAtTime(0, time+1.0); osc.start(time); osc.stop(time+1.0); }
-            else { osc.type = 'sine'; osc.frequency.setValueAtTime(100, time); osc.frequency.exponentialRampToValueAtTime(0.01, time+0.2); gain.gain.setValueAtTime(0.8*finalVol, time); gain.gain.exponentialRampToValueAtTime(0.01, time+0.2); osc.start(time); osc.stop(time+0.2); }
-        }
-    } 
-    // --- ROW 1: BASS ---
-    else if (row === 1) { 
-        const subFreq = baseFreq / 2;
-        if (color === 'red') { 
-            if (kit === 'TECHNO') { osc.type = 'sawtooth'; filter.type = 'lowpass'; filter.frequency.setValueAtTime(2000, time); filter.frequency.exponentialRampToValueAtTime(80, time+0.2); filter.Q.value=10; gain.gain.setValueAtTime(0.6*finalVol, time); gain.gain.exponentialRampToValueAtTime(0.01, time+0.3); }
-            else if (kit === '8-BIT') { osc.type = 'square'; osc.frequency.value = subFreq; gain.gain.setValueAtTime(0.6*finalVol, time); gain.gain.setValueAtTime(0.6*finalVol, time+0.2); gain.gain.linearRampToValueAtTime(0, time+0.25); }
-            else if (kit === 'GLITCH-HOP') { osc.type = 'sine'; osc.frequency.value = subFreq; const ws = ctx.createWaveShaper(); ws.curve = distortionCurve; osc.disconnect(); osc.connect(ws); ws.connect(gain); gain.gain.setValueAtTime(0.4*finalVol, time); gain.gain.linearRampToValueAtTime(0, time+0.3); }
-            else { osc.type = 'sine'; osc.frequency.value = subFreq; gain.gain.setValueAtTime(0.6*finalVol, time); gain.gain.exponentialRampToValueAtTime(0.01, time+0.4); }
-            osc.start(time); osc.stop(time+0.4);
-        }
-        else if (color === 'yellow') {
-            if (kit === 'TECHNO') { osc.type = 'sawtooth'; filter.type = 'lowpass'; filter.frequency.setValueAtTime(1000, time); filter.frequency.linearRampToValueAtTime(300, time+0.2); gain.gain.setValueAtTime(0.5*finalVol, time); gain.gain.setTargetAtTime(0, time+0.15, 0.1); osc.start(time); osc.stop(time+0.3); }
-            else if (kit === '8-BIT') { osc.type = 'triangle'; osc.frequency.value = subFreq; gain.gain.setValueAtTime(0.6*finalVol, time); gain.gain.setValueAtTime(0.6*finalVol, time+0.1); gain.gain.linearRampToValueAtTime(0, time+0.15); osc.start(time); osc.stop(time+0.15); }
-            else if (kit === 'RETRO-WAVE') { osc.type = 'sawtooth'; filter.type = 'lowpass'; filter.frequency.setValueAtTime(3000, time); filter.frequency.exponentialRampToValueAtTime(200, time+0.2); filter.Q.value = 5; gain.gain.setValueAtTime(0.5*finalVol, time); gain.gain.setTargetAtTime(0, time+0.1, 0.1); osc.start(time); osc.stop(time+0.3); }
-            else if (kit === 'GLITCH-HOP') { osc.type = 'sawtooth'; const lfo = ctx.createOscillator(); lfo.frequency.value = 8; const lfoGain = ctx.createGain(); lfoGain.gain.value = 1000; lfo.connect(lfoGain); lfoGain.connect(filter.frequency); filter.type = 'lowpass'; filter.frequency.value = 1000; filter.Q.value = 10; gain.gain.setValueAtTime(0.4*finalVol, time); gain.gain.linearRampToValueAtTime(0, time+0.4); lfo.start(time); osc.start(time); lfo.stop(time+0.4); osc.stop(time+0.4); }
-            else if (kit === 'DEEP-DUB') { osc.type = 'triangle'; filter.type = 'lowpass'; filter.frequency.value = 400; gain.gain.setValueAtTime(0, time); gain.gain.linearRampToValueAtTime(0.6*finalVol, time+0.1); gain.gain.linearRampToValueAtTime(0, time+0.6); osc.start(time); osc.stop(time+0.6); }
-            else { osc.type = 'sawtooth'; filter.type = 'lowpass'; filter.frequency.setValueAtTime(1500, time); filter.frequency.exponentialRampToValueAtTime(100, time+0.2); gain.gain.setValueAtTime(0.4*finalVol, time); gain.gain.setTargetAtTime(0, time+0.1, 0.1); osc.start(time); osc.stop(time+0.3); }
-        }
-        else if (color === 'blue') {
-            osc.type = kit==='AMBIENT'||kit==='DEEP-DUB'||kit==='TECHNO'?'sine':(kit==='8-BIT'?'square':'square'); osc.frequency.value = subFreq;
-            gain.gain.setValueAtTime(0.5*finalVol, time); gain.gain.exponentialRampToValueAtTime(0.01, time+0.15); osc.start(time); osc.stop(time+0.15);
-        }
-        else if (color === 'green') {
-            osc.type = kit==='8-BIT'||kit==='GLITCH-HOP'||kit==='TECHNO'?'square':'triangle'; osc.frequency.value = subFreq;
-            gain.gain.setValueAtTime(0, time); gain.gain.linearRampToValueAtTime(0.5*finalVol, time+0.2); gain.gain.linearRampToValueAtTime(0, time+0.8); osc.start(time); osc.stop(time+0.8);
-        }
-        else if (color === 'purple') {
-            osc.type = kit==='8-BIT'?'square':'sawtooth'; osc.frequency.setValueAtTime(subFreq/2, time); osc.frequency.linearRampToValueAtTime(subFreq, time+0.1);
-            gain.gain.setValueAtTime(0.4*finalVol, time); gain.gain.linearRampToValueAtTime(0, time+0.4); osc.start(time); osc.stop(time+0.4);
-        }
-    }
-    // --- ROW 2: MELODY ---
-    else if (row === 2) {
-        if (color === 'red') { 
-            if (kit === 'TECHNO') { osc.type = 'sawtooth'; const o2 = ctx.createOscillator(); o2.type='sawtooth'; o2.frequency.value=baseFreq*1.02; osc.frequency.value=baseFreq; o2.connect(filter); filter.type='lowpass'; filter.frequency.setValueAtTime(4000, time); filter.frequency.exponentialRampToValueAtTime(200, time+0.3); gain.gain.setValueAtTime(0.4*finalVol, time); gain.gain.exponentialRampToValueAtTime(0.01, time+0.4); osc.start(time); o2.start(time); osc.stop(time+0.4); o2.stop(time+0.4); }
-            else if (kit === '8-BIT') { osc.type = 'square'; osc.frequency.value = baseFreq; gain.gain.setValueAtTime(0.4*finalVol, time); gain.gain.setValueAtTime(0.4*finalVol, time+0.15); gain.gain.linearRampToValueAtTime(0, time+0.2); osc.start(time); osc.stop(time+0.2); }
-            else if (kit === 'RETRO-WAVE') { const o2 = ctx.createOscillator(); o2.type = 'sawtooth'; osc.type = 'sawtooth'; osc.frequency.value = baseFreq; o2.frequency.value = baseFreq*1.01; o2.connect(filter); filter.type='lowpass'; filter.frequency.value=3000; gain.gain.setValueAtTime(0.3*finalVol, time); gain.gain.linearRampToValueAtTime(0, time+0.5); osc.start(time); o2.start(time); osc.stop(time+0.5); o2.stop(time+0.5); }
-            else if (kit === 'GLITCH-HOP') { osc.type = 'square'; osc.frequency.setValueAtTime(baseFreq, time); osc.frequency.setValueAtTime(baseFreq*2, time+0.1); gain.gain.setValueAtTime(0.3*finalVol, time); gain.gain.linearRampToValueAtTime(0, time+0.2); osc.start(time); osc.stop(time+0.2); }
-            else if (kit === 'DEEP-DUB') { osc.type = 'triangle'; filter.type='lowpass'; filter.frequency.setValueAtTime(2000, time); filter.frequency.exponentialRampToValueAtTime(500, time+0.3); gain.gain.setValueAtTime(0.4*finalVol, time); gain.gain.linearRampToValueAtTime(0, time+0.4); osc.start(time); osc.stop(time+0.4); }
-            else { osc.type = 'sawtooth'; osc.frequency.value = baseFreq; gain.gain.setValueAtTime(0.3*finalVol, time); gain.gain.linearRampToValueAtTime(0, time+0.4); osc.start(time); osc.stop(time+0.4); }
-        }
-        else if (color === 'yellow') {
-            osc.type = kit==='AMBIENT'||kit==='DEEP-DUB'?'sine':(kit==='8-BIT'?'square':'square'); osc.frequency.value = baseFreq;
-            gain.gain.setValueAtTime(0.3*finalVol, time); gain.gain.setTargetAtTime(0, time+0.05, 0.01); osc.start(time); osc.stop(time+0.1);
-        }
-        else if (color === 'blue') {
-            if (kit === 'GLITCH-HOP') { osc.type = 'sine'; const fm = ctx.createOscillator(); fm.type='sine'; fm.frequency.value = baseFreq*3.5; const fmg = ctx.createGain(); fmg.gain.value=1000; fm.connect(fmg); fmg.connect(osc.frequency); fm.start(time); fm.stop(time+0.3); }
-            else { osc.type = kit==='8-BIT'?'triangle':'sine'; }
-            osc.frequency.value = baseFreq*2; gain.gain.setValueAtTime(0.4*finalVol, time); gain.gain.exponentialRampToValueAtTime(0.01, time+0.5); osc.start(time); osc.stop(time+0.5);
-        }
-        else if (color === 'green') {
-            osc.type = kit==='8-BIT'?'square':(kit==='AMBIENT'?'sine':'triangle'); osc.frequency.value = baseFreq; filter.type='lowpass'; filter.frequency.value=kit==='8-BIT'?1000:4000;
-            gain.gain.setValueAtTime(0, time); gain.gain.linearRampToValueAtTime(0.3*finalVol, time+0.2); gain.gain.linearRampToValueAtTime(0, time+0.6); osc.start(time); osc.stop(time+0.6);
-        }
-        else if (color === 'purple') {
-            osc.type = kit==='AMBIENT'||kit==='DEEP-DUB'?'triangle':'square'; osc.frequency.setValueAtTime(baseFreq, time); osc.frequency.setValueAtTime(baseFreq*1.5, time+0.1);
-            gain.gain.setValueAtTime(0.2*finalVol, time); gain.gain.linearRampToValueAtTime(0, time+0.2); osc.start(time); osc.stop(time+0.2);
-        }
-    }
-    // --- ROW 3: FX ---
-    else if (row === 3) {
-        if (color === 'red') {
-            osc.type = kit==='8-BIT'?'square':'sawtooth'; osc.frequency.setValueAtTime(baseFreq, time); osc.frequency.linearRampToValueAtTime(baseFreq*4, time+0.4);
-            gain.gain.setValueAtTime(0.2*finalVol, time); gain.gain.linearRampToValueAtTime(0, time+0.4); osc.start(time); osc.stop(time+0.4);
-        }
-        else if (color === 'yellow') {
-            osc.type = kit==='AMBIENT'||kit==='DEEP-DUB'?'sine':'square'; osc.frequency.setValueAtTime(baseFreq*4, time); osc.frequency.exponentialRampToValueAtTime(10, time+0.1);
-            gain.gain.setValueAtTime(0.3*finalVol, time); gain.gain.linearRampToValueAtTime(0, time+0.1); osc.start(time); osc.stop(time+0.1);
-        }
-        else if (color === 'blue') {
-            if (kit === 'RETRO-WAVE') { osc.type='square'; osc.frequency.value=baseFreq; filter.type='lowpass'; filter.frequency.setValueAtTime(5000, time); filter.frequency.linearRampToValueAtTime(100, time+0.2); gain.gain.setValueAtTime(0.4*finalVol, time); gain.gain.linearRampToValueAtTime(0, time+0.2); osc.start(time); osc.stop(time+0.2); }
-            else if (kit === 'DEEP-DUB') { osc.type='sine'; osc.frequency.setValueAtTime(baseFreq*2, time); gain.gain.setValueAtTime(0.3*finalVol, time); gain.gain.linearRampToValueAtTime(0, time+0.2); osc.start(time); osc.stop(time+0.2); }
-            else { osc.type = kit==='8-BIT'?'square':'sine'; osc.frequency.setValueAtTime(baseFreq*2, time); if(kit==='TECHNO'||kit==='GLITCH-HOP'){osc.frequency.exponentialRampToValueAtTime(10, time+0.6);}else{osc.frequency.linearRampToValueAtTime(baseFreq*1.8, time+0.6);} gain.gain.setValueAtTime(0.4*finalVol, time); gain.gain.linearRampToValueAtTime(0, time+0.6); osc.start(time); osc.stop(time+0.6); }
-        }
-        else if (color === 'green') {
-            osc.type = kit==='8-BIT'?'square':'triangle'; osc.frequency.setValueAtTime(baseFreq, time); osc.frequency.setValueAtTime(baseFreq*1.2, time+0.15); osc.frequency.setValueAtTime(baseFreq, time+0.3);
-            gain.gain.setValueAtTime(0.3*finalVol, time); gain.gain.linearRampToValueAtTime(0, time+0.45); osc.start(time); osc.stop(time+0.45);
-        }
-        else if (color === 'purple') {
-            osc.type = kit==='AMBIENT'?'sine':'square'; const rp = baseFreq*(0.5+Math.random()*2); osc.frequency.setValueAtTime(rp, time);
-            if(kit==='GLITCH-HOP'){osc.frequency.setValueAtTime(rp*2, time+0.05); osc.frequency.setValueAtTime(rp*0.5, time+0.1);}
-            filter.type = 'lowpass'; filter.frequency.setValueAtTime(5000, time); filter.frequency.linearRampToValueAtTime(100, time+0.2);
-            gain.gain.setValueAtTime(0.3*finalVol, time); gain.gain.linearRampToValueAtTime(0, time+0.2); osc.start(time); osc.stop(time+0.2);
-        }
-    }
-    // --- ROW 4: VOCALS ---
-    else if (row === 4) {
-        osc.disconnect(); filter.disconnect(); gain.disconnect();
-        const vGain = ctx.createGain(); 
-        vGain.connect(dryGain); vGain.connect(crushGain); vGain.connect(echoGain); vGain.connect(bothGain);
-
-        if (color === 'red') { 
-            if (kit === 'TECHNO' || kit === 'RETRO-WAVE') { 
-                const o1 = ctx.createOscillator(); const o2 = ctx.createOscillator(); const f1 = ctx.createBiquadFilter(); const f2 = ctx.createBiquadFilter();
-                o1.type = 'sawtooth'; o2.type = 'sawtooth'; o1.frequency.value = baseFreq; o2.frequency.value = baseFreq * 1.02;
-                f1.type = 'bandpass'; f1.frequency.value = 700; f1.Q.value = 5; f2.type = 'bandpass'; f2.frequency.value = 1100; f2.Q.value = 5;
-                o1.connect(f1); o2.connect(f2); f1.connect(vGain); f2.connect(vGain); f1.frequency.exponentialRampToValueAtTime(400, time+0.3);
-                vGain.gain.setValueAtTime(0.5*finalVol, time); vGain.gain.exponentialRampToValueAtTime(0.01, time+0.4); o1.start(time); o2.start(time); o1.stop(time+0.4); o2.stop(time+0.4);
-            } else if (kit === '8-BIT') { 
-                const o = ctx.createOscillator(); o.type = 'square'; o.frequency.value = baseFreq/2;
-                vGain.gain.setValueAtTime(0.4*finalVol, time); vGain.gain.setValueAtTime(0, time+0.05); vGain.gain.setValueAtTime(0.4*finalVol, time+0.1); vGain.gain.setValueAtTime(0, time+0.15); vGain.gain.setValueAtTime(0.4*finalVol, time+0.2); vGain.gain.linearRampToValueAtTime(0, time+0.3);
-                o.connect(vGain); o.start(time); o.stop(time+0.3);
-            } else { 
-                const o1 = ctx.createOscillator(); const o2 = ctx.createOscillator(); o1.type = 'sine'; o2.type = 'triangle'; o1.frequency.value = baseFreq/2; o2.frequency.value = baseFreq/2+1;
-                const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 600; o1.connect(f); o2.connect(f); f.connect(vGain);
-                vGain.gain.setValueAtTime(0, time); vGain.gain.linearRampToValueAtTime(0.6*finalVol, time+0.5); vGain.gain.linearRampToValueAtTime(0, time+1.5); o1.start(time); o2.start(time); o1.stop(time+1.5); o2.stop(time+1.5);
-            }
-        } else if (color === 'yellow') { 
-            if (kit === 'GLITCH-HOP') {
-                const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = baseFreq/2; const f = ctx.createBiquadFilter(); f.type='bandpass'; f.Q.value=10; f.frequency.setValueAtTime(400, time); f.frequency.exponentialRampToValueAtTime(2000, time+0.2); f.frequency.exponentialRampToValueAtTime(400, time+0.4); o.connect(f); f.connect(vGain); vGain.gain.setValueAtTime(0.5*finalVol, time); vGain.gain.linearRampToValueAtTime(0, time+0.4); o.start(time); o.stop(time+0.4);
-            } else if (kit === '8-BIT') { 
-                const o = ctx.createOscillator(); o.type = 'square'; o.frequency.setValueAtTime(baseFreq, time); o.frequency.setValueAtTime(baseFreq*2, time+0.05); o.frequency.setValueAtTime(baseFreq, time+0.1); o.frequency.setValueAtTime(baseFreq*2, time+0.15); vGain.gain.setValueAtTime(0.3*finalVol, time); vGain.gain.linearRampToValueAtTime(0, time+0.2); o.connect(vGain); o.start(time); o.stop(time+0.2);
-            } else { 
-                const o = ctx.createOscillator(); o.type = 'sine'; const lfo = ctx.createOscillator(); lfo.type = 'sine'; lfo.frequency.value = 5; const lfoGain = ctx.createGain(); lfoGain.gain.value = 10; lfo.connect(lfoGain); lfoGain.connect(o.frequency); o.frequency.value = baseFreq*2; vGain.gain.setValueAtTime(0, time); vGain.gain.linearRampToValueAtTime(0.4*finalVol, time+0.4); vGain.gain.linearRampToValueAtTime(0, time+1.2); o.connect(vGain); lfo.start(time); o.start(time); lfo.stop(time+1.2); o.stop(time+1.2);
-            }
-        } else if (color === 'blue') { 
-            if (kit === 'TECHNO' || kit === 'RETRO-WAVE') { 
-                const o = ctx.createOscillator(); o.type = 'triangle'; o.frequency.value = baseFreq; const ws = ctx.createWaveShaper(); ws.curve = new Float32Array([-1, -0.8, 0, 0.8, 1]); o.connect(ws); ws.connect(vGain); vGain.gain.setValueAtTime(0.5*finalVol, time); vGain.gain.exponentialRampToValueAtTime(0.01, time+0.4); o.start(time); o.stop(time+0.4);
-            } else if (kit === '8-BIT') { 
-                const o = ctx.createOscillator(); o.type = 'square'; o.frequency.setValueAtTime(baseFreq*1.5, time); o.frequency.setValueAtTime(baseFreq*1.2, time+0.05); o.frequency.setValueAtTime(baseFreq, time+0.1); o.frequency.setValueAtTime(baseFreq*0.8, time+0.15); vGain.gain.setValueAtTime(0.4*finalVol, time); vGain.gain.linearRampToValueAtTime(0, time+0.25); o.connect(vGain); o.start(time); o.stop(time+0.25);
-            } else { 
-                const o1 = ctx.createOscillator(); const o2 = ctx.createOscillator(); o1.type = 'sine'; o2.type = 'sine'; o1.frequency.value = baseFreq; o2.frequency.value = baseFreq/2; o1.connect(vGain); o2.connect(vGain); vGain.gain.setValueAtTime(0, time); vGain.gain.linearRampToValueAtTime(0.5*finalVol, time+0.8); vGain.gain.linearRampToValueAtTime(0, time+2.0); o1.start(time); o2.start(time); o1.stop(time+2.0); o2.stop(time+2.0);
-            }
-        } else if (color === 'green') { 
-            const nSource = ctx.createBufferSource(); nSource.buffer = noiseBuffer; const f = ctx.createBiquadFilter();
-            if (kit === 'TECHNO' || kit === 'GLITCH-HOP') { 
-                f.type = 'highpass'; f.frequency.setValueAtTime(5000, time); f.frequency.exponentialRampToValueAtTime(1000, time+0.2); vGain.gain.setValueAtTime(0.4*finalVol, time); vGain.gain.exponentialRampToValueAtTime(0.01, time+0.2); nSource.connect(f); f.connect(vGain); nSource.start(time); nSource.stop(time+0.2);
-            } else if (kit === '8-BIT') { 
-                f.type = 'bandpass'; f.frequency.value = 2000+(pitchIdx*200); f.Q.value = 5; vGain.gain.setValueAtTime(0.5*finalVol, time); vGain.gain.setValueAtTime(0, time+0.05); vGain.gain.setValueAtTime(0.5*finalVol, time+0.1); vGain.gain.linearRampToValueAtTime(0, time+0.15); nSource.connect(f); f.connect(vGain); nSource.start(time); nSource.stop(time+0.15);
-            } else { 
-                f.type = 'bandpass'; f.frequency.setValueAtTime(400, time); f.frequency.linearRampToValueAtTime(1500, time+1.0); f.Q.value = 3; vGain.gain.setValueAtTime(0, time); vGain.gain.linearRampToValueAtTime(0.3*finalVol, time+0.5); vGain.gain.linearRampToValueAtTime(0, time+1.5); nSource.connect(f); f.connect(vGain); nSource.start(time); nSource.stop(time+1.5);
-            }
-        } else if (color === 'purple') { 
-            if (kit === 'TECHNO' || kit === 'RETRO-WAVE') { 
-                const f0 = baseFreq; const f1 = baseFreq*1.25; const f2 = baseFreq*1.5; const f3 = baseFreq*1.875;
-                [f0, f1, f2, f3].forEach(f => { const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f; o.connect(vGain); o.start(time); o.stop(time+0.3); });
-                vGain.gain.setValueAtTime(0.2*finalVol, time); vGain.gain.exponentialRampToValueAtTime(0.01, time+0.3);
-            } else if (kit === '8-BIT' || kit === 'GLITCH-HOP') { 
-                const o = ctx.createOscillator(); o.type = kit==='8-BIT'?'square':'sawtooth'; const f0 = baseFreq; const f1 = baseFreq*1.25; const f2 = baseFreq*1.5; const spd = 0.03;
-                o.frequency.setValueAtTime(f0, time); o.frequency.setValueAtTime(f1, time+spd); o.frequency.setValueAtTime(f2, time+spd*2); o.frequency.setValueAtTime(f0, time+spd*3); o.frequency.setValueAtTime(f1, time+spd*4); o.frequency.setValueAtTime(f2, time+spd*5);
-                vGain.gain.setValueAtTime(0.3*finalVol, time); vGain.gain.linearRampToValueAtTime(0, time+0.2); o.connect(vGain); o.start(time); o.stop(time+0.2);
-            } else { 
-                const o1 = ctx.createOscillator(); const o2 = ctx.createOscillator(); o1.type = 'sine'; o2.type = 'sine'; o1.frequency.value = baseFreq; o2.frequency.value = baseFreq*1.5; o1.connect(vGain); o2.connect(vGain);
-                vGain.gain.setValueAtTime(0, time); vGain.gain.linearRampToValueAtTime(0.4*finalVol, time+1.0); vGain.gain.linearRampToValueAtTime(0, time+3.0); o1.start(time); o2.start(time); o1.stop(time+3.0); o2.stop(time+3.0);
-            }
-        }
-    }
-}
-
-// --- SEQUENCER & MACRO LOGIC ---
-function getActiveTimelineSequence() { let maxIdx = -1; timelineSlots.forEach((slot, i) => { if(slot.firstChild) maxIdx = i; }); if(maxIdx === -1) return null; const seq = []; for(let i=0; i<=maxIdx; i++) { seq.push(timelineSlots[i].firstChild ? parseInt(timelineSlots[i].firstChild.dataset.loopId) : -1); } return seq; }
-
-function schedule() {
-    while (nextNoteTime < ctx.currentTime + 0.1) {
-        if (playbackMode === 'SONG' && currentStep === 0) {
-            const sequence = getActiveTimelineSequence();
-            if (sequence) {
-                if (currentMacroStep >= sequence.length) currentMacroStep = 0; activeSongLoop = sequence[currentMacroStep]; const stepToHighlight = currentMacroStep;
-                requestAnimationFrame(() => { timelineSlots.forEach(s => s.classList.remove('active-macro')); if(timelineSlots[stepToHighlight]) timelineSlots[stepToHighlight].classList.add('active-macro'); });
-                currentMacroStep++;
-            } else { playbackMode = 'GRID'; activeSongLoop = -1; }
-        }
-        
-        processStep(currentStep, nextNoteTime); 
-        
-        // Rhythm / Groove calculations
-        let stepDur = stepTime;
-        if (activeRhythm === 'SWING') {
-            stepDur = (currentStep % 2 === 0) ? stepTime * 1.33 : stepTime * 0.67;
-        } else if (activeRhythm === 'HEAVY_SWING') {
-            stepDur = (currentStep % 2 === 0) ? stepTime * 1.5 : stepTime * 0.5;
-        }
-        
-        nextNoteTime += stepDur; 
-        currentStep = (currentStep + 1) % STEPS;
-    } 
-    if (playbackMode !== 'STOPPED') { timerID = requestAnimationFrame(schedule); }
-}
-
-const colorMap = { 'red': 'rgba(255, 51, 102, 0.4)', 'yellow': 'rgba(255, 204, 0, 0.4)', 'blue': 'rgba(0, 204, 255, 0.4)', 'green': 'rgba(51, 255, 102, 0.4)', 'purple': 'rgba(204, 51, 255, 0.4)' };
-
-function processStep(step, time) {
-    requestAnimationFrame(() => {
-        document.querySelectorAll('.cell').forEach(c => c.classList.remove('active')); let flashColor = null;
-        for (let r = 0; r < rows.length; r++) { cells[r][step].classList.add('active'); }
-        if (playbackMode === 'GRID') { 
-            for (let r = 0; r < rows.length; r++) { 
-                const blocks = cells[r][step].querySelectorAll('.block'); 
-                if (blocks.length > 0 && !flashColor) flashColor = blocks[0].dataset.color; 
-            } 
-        } else if (playbackMode === 'SONG') { 
-            if (activeSongLoop !== -1 && loopMemory[activeSongLoop]) { 
-                const colData = loopMemory[activeSongLoop][step]; 
-                for (let r = 0; r < rows.length; r++) { if (colData[r].length > 0 && !flashColor) { flashColor = colData[r][0].color; } } 
-            } 
-        }
-        
-        if (flashColor) { gridEl.style.backgroundColor = colorMap[flashColor]; setTimeout(() => { gridEl.style.backgroundColor = 'transparent'; }, 150); }
-    });
-    
-    if (playbackMode === 'GRID') { 
-        for (let r = 0; r < rows.length; r++) { 
-            const blocks = cells[r][step].querySelectorAll('.block'); 
-            blocks.forEach(block => {
-                playSound(r, block.dataset.color, parseInt(block.dataset.pitch), parseFloat(block.dataset.volume), cells[r][step], time); 
-            });
-        } 
-    } else if (playbackMode === 'SONG') { 
-        if (activeSongLoop !== -1 && loopMemory[activeSongLoop]) { 
-            const colData = loopMemory[activeSongLoop][step]; 
-            for (let r = 0; r < rows.length; r++) { colData[r].forEach(b => { playSound(r, b.color, b.pitch, b.volume || 1.0, null, time); }); } 
-        } 
-    }
-}
-
-function stopEngine() { playbackMode = 'STOPPED'; activeSongLoop = -1; cancelAnimationFrame(timerID); document.querySelectorAll('.cell').forEach(c => c.classList.remove('active')); timelineSlots.forEach(s => s.classList.remove('active-macro')); }
-document.getElementById('btn-stop').addEventListener('click', stopEngine);
-document.getElementById('btn-play-grid').addEventListener('click', () => { if (ctx.state === 'suspended') ctx.resume(); if (playbackMode === 'GRID') return; stopEngine(); playbackMode = 'GRID'; nextNoteTime = ctx.currentTime + 0.05; currentStep = 0; schedule(); });
-document.getElementById('btn-play-song').addEventListener('click', () => { if (ctx.state === 'suspended') ctx.resume(); if (playbackMode === 'SONG') return; stopEngine(); playbackMode = 'SONG'; nextNoteTime = ctx.currentTime + 0.05; currentStep = 0; currentMacroStep = 0; schedule(); });
-document.getElementById('btn-clear').addEventListener('click', () => { document.querySelectorAll('.cell').forEach(c => c.innerHTML = ''); document.querySelectorAll('.row-fx-slot').forEach(s => s.innerHTML = ''); });
-
-</script>
 </body>
 </html>
