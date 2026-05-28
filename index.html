@@ -42,7 +42,18 @@
         .block[data-color="green"] { background: var(--green); }
         .block[data-color="purple"] { background: var(--purple); }
 
-        .block .pitch-val { position: relative; z-index: 2; pointer-events: none;}
+        .voice-block { background: linear-gradient(135deg, #666, #333) !important; border: 2px solid #ff66b2 !important; color: white !important; height: 30px !important;} 
+        .voice-block .vol-bar { background: rgba(255,255,255,0.3) !important; }
+
+        /* FIXED: Block UI Stacking and Shrink Rules */
+        .block-ui { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 2; pointer-events: none; }
+        .val-container { display: flex; flex-direction: column; gap: 1px; align-items: center; justify-content: center; }
+        .voice-block .val-container { flex-direction: row; gap: 4px; }
+        .val-container span { flex-shrink: 0; } /* Prevents text from collapsing and overlapping */
+        .pitch-val { color: #000; font-size: 12px; font-weight: bold; line-height: 1; }
+        .speed-val { color: #fff; font-size: 9px; font-weight: bold; text-shadow: 1px 1px 0 #000; line-height: 1; margin-top: 1px; }
+        .voice-label { position: absolute; top: 2px; right: 4px; font-size: 8px; font-weight: bold; color: #fff; z-index: 3; pointer-events: none; }
+
         .block .vol-bar { position: absolute; bottom: 0; left: 0; width: 100%; background: rgba(0,0,0,0.25); z-index: 1; transition: height 0.1s; pointer-events: none;}
 
         .fx-token { width: 45px; height: 20px; border-radius: 4px; color: #fff; font-size: 9px; font-weight: bold; display: flex; justify-content: center; align-items: center; cursor: grab; border: 2px solid #888; box-shadow: 0 2px 5px rgba(0,0,0,0.5); user-select: none; position: relative; overflow: hidden;}
@@ -54,14 +65,21 @@
         .fx-token .fx-label { position: relative; z-index: 2; pointer-events: none;}
         .fx-bar { position: absolute; bottom: 0; left: 0; width: 100%; background: rgba(255,255,255,0.3); z-index: 1; pointer-events: none; transition: height 0.1s; }
         
-        #grid { display: grid; grid-template-columns: 100px repeat(8, 70px) 70px; grid-template-rows: repeat(5, minmax(85px, auto)); gap: 5px; padding: 15px; border-radius: 12px; transition: background-color 0.1s ease-out; background-color: transparent; }
+        #grid { display: grid; grid-template-columns: 100px repeat(8, 70px) 70px; grid-auto-rows: auto; gap: 5px; padding: 15px; border-radius: 12px; transition: background-color 0.1s ease-out; background-color: transparent; }
+        
         .row-controls { display: flex; flex-direction: column; align-items: flex-end; justify-content: center; padding-right: 15px; gap: 5px; }
         .row-label { font-size: 12px; color: #ccc; font-weight: bold; text-transform: uppercase; }
         .row-volume { width: 70px; cursor: pointer; accent-color: var(--green); }
         
-        .cell { background: var(--grid-bg); border: 1px solid #333; border-radius: 4px; display: flex; flex-direction: column-reverse; align-items: center; justify-content: flex-start; padding: 5px 18px; gap: 2px; position: relative; }
+        .cell { background: var(--grid-bg); border: 1px solid #333; border-radius: 4px; display: flex; flex-direction: column-reverse; align-items: center; justify-content: flex-start; padding: 5px 18px; gap: 2px; position: relative; height: 85px; box-sizing: border-box;}
         .cell.active { background: var(--active-col); }
         
+        .voice-sub-cell { height: 40px; border: 1px dashed #555; background: rgba(0,0,0,0.3); margin-bottom: 15px; } 
+        .voice-sub-cell.active { background: rgba(255,255,255,0.05); border-color: #888; }
+        .row-controls.voice-sub-controls { height: 40px; justify-content: center; margin-bottom: 15px; }
+        .row-fx-slot.voice-sub-fx { height: 40px; border: 1px dashed #555; background: #111; margin-bottom: 15px;}
+        .row-fx-slot.voice-sub-fx::before { content: "MIC FX"; top: -12px; color: #777; }
+
         .cell .block { width: 100%; height: 20px; cursor: pointer; font-size: 10px; position: relative; z-index: 2;}
         
         .cell .fx-token { position: absolute; width: 12px; height: 35px; z-index: 1; color: transparent; border-radius: 2px; border-width: 1px;}
@@ -81,8 +99,9 @@
         #right-panel { display: flex; flex-direction: column; gap: 20px; width: 250px; }
         .panel-box { background: var(--grid-bg); border: 1px solid #444; border-radius: 8px; padding: 15px; display: flex; flex-direction: column;}
         .panel-title { font-size: 12px; color: #888; margin-bottom: 10px; text-transform: uppercase; }
-        #loop-bank { display: flex; flex-wrap: wrap; gap: 10px; overflow-y: auto; align-content: flex-start; min-height: 150px; }
-        #song-bank { display: flex; flex-wrap: wrap; gap: 10px; overflow-y: auto; align-content: flex-start; min-height: 150px; }
+        
+        #loop-bank, #song-bank, #voice-bank { display: flex; flex-wrap: wrap; gap: 10px; overflow-y: auto; align-content: flex-start; min-height: 120px; }
+        #voice-bank { min-height: 80px; }
         
         .loop-token { width: 50px; height: 50px; background: #111; border-radius: 4px; display: flex; gap: 2px; padding: 4px; cursor: grab; border: 2px solid #555; overflow: hidden; transition: transform 0.1s; user-select: none; }
         .loop-token:hover { transform: scale(1.05); }
@@ -107,6 +126,7 @@
         <button id="btn-play-song">PLAY SONG</button>
         <button id="btn-stop">STOP</button>
         <button id="btn-kit">ACTIVE KIT: TECHNO</button>
+        <button id="btn-mic">🎤 REC VOICE</button>
         <button id="btn-clear">CLEAR GRID</button>
         <button id="btn-save">SAVE LOOP</button>
         <button id="btn-save-new" style="display: none; background: var(--blue); color: #000;">SAVE AS NEW</button>
@@ -117,67 +137,36 @@
     </div>
     
     <div class="instructions">
-        <span class="highlight">PITCH:</span> Click/Scroll on Blocks *
-        <span class="highlight">VOL / FX MIX:</span> Scroll/Click on Blocks or Tokens *
-        <span class="highlight">REMOVE:</span> Shift-Click or Drag
+        <span class="highlight">PITCH:</span> Scroll on Blocks *
+        <span class="highlight">SPEED:</span> Alt+Scroll on Blocks *
+        <span class="highlight">VOL/FX:</span> Ctrl+Scroll on Blocks/Tokens *
+        <span class="highlight">ROUTING:</span> Ctrl+Click FX Tokens
     </div>
 
     <div id="main-workspace">
         <div id="left-panel">
             <div id="palette">
-                
                 <div class="block" draggable="true" data-type="block" data-color="red"><span class="pitch-val">R</span></div>
                 <div class="block" draggable="true" data-type="block" data-color="yellow"><span class="pitch-val">Y</span></div>
                 <div class="block" draggable="true" data-type="block" data-color="blue"><span class="pitch-val">B</span></div>
                 <div class="block" draggable="true" data-type="block" data-color="green"><span class="pitch-val">G</span></div>
                 <div class="block" draggable="true" data-type="block" data-color="purple"><span class="pitch-val">P</span></div>
-                
                 <div class="palette-divider"></div>
-                
-                <div class="fx-token" draggable="true" data-type="fx" data-fx="crush" data-amount="1.0">
-                    <div class="fx-bar" style="height: 100%"></div><span class="fx-label">CRUSH</span>
-                </div>
-                <div class="fx-token" draggable="true" data-type="fx" data-fx="echo" data-amount="1.0">
-                    <div class="fx-bar" style="height: 100%"></div><span class="fx-label">ECHO</span>
-                </div>
-                <div class="fx-token" draggable="true" data-type="fx" data-fx="reverb" data-amount="1.0">
-                    <div class="fx-bar" style="height: 100%"></div><span class="fx-label">REVERB</span>
-                </div>
-                <div class="fx-token" draggable="true" data-type="fx" data-fx="chorus" data-amount="1.0">
-                    <div class="fx-bar" style="height: 100%"></div><span class="fx-label">CHORUS</span>
-                </div>
-
+                <div class="fx-token" draggable="true" data-type="fx" data-fx="crush" data-amount="1.0"><div class="fx-bar" style="height: 100%"></div><span class="fx-label">CRUSH</span></div>
+                <div class="fx-token" draggable="true" data-type="fx" data-fx="echo" data-amount="1.0"><div class="fx-bar" style="height: 100%"></div><span class="fx-label">ECHO</span></div>
+                <div class="fx-token" draggable="true" data-type="fx" data-fx="reverb" data-amount="1.0"><div class="fx-bar" style="height: 100%"></div><span class="fx-label">REVERB</span></div>
+                <div class="fx-token" draggable="true" data-type="fx" data-fx="chorus" data-amount="1.0"><div class="fx-bar" style="height: 100%"></div><span class="fx-label">CHORUS</span></div>
                 <div class="palette-divider"></div>
-
                 <div class="theory-controls">
-                    <select id="sel-key">
-                        <option value="60">C</option><option value="61">Db / C#</option>
-                        <option value="62">D</option><option value="63">Eb / D#</option>
-                        <option value="64">E</option><option value="65">F</option>
-                        <option value="66">Gb / F#</option><option value="67">G</option>
-                        <option value="68">Ab / G#</option><option value="69">A</option>
-                        <option value="70">Bb / A#</option><option value="71">B</option>
-                    </select>
-                    <select id="sel-scale">
-                        <option value="MINOR PENT">Min Pent</option>
-                        <option value="PENTATONIC">Maj Pent</option>
-                        <option value="MINOR">Minor</option>
-                        <option value="MAJOR">Major</option>
-                        <option value="BLUES">Blues</option>
-                    </select>
-                    <select id="sel-rhythm">
-                        <option value="STRAIGHT">Straight</option>
-                        <option value="LIGHT_SHUFFLE">Light Shuffle (54%)</option>
-                        <option value="CLASSIC_MPC">Classic MPC (60%)</option>
-                        <option value="SWING">Swing (67%)</option>
-                        <option value="HARD_SHUFFLE">Hard Shuffle (75%)</option>
-                        <option value="RUSHED">Rushed (Push)</option>
-                    </select>
+                    <select id="sel-key"><option value="60">C</option><option value="61">Db / C#</option><option value="62">D</option><option value="63">Eb / D#</option><option value="64">E</option><option value="65">F</option><option value="66">Gb / F#</option><option value="67">G</option><option value="68">Ab / G#</option><option value="69">A</option><option value="70">Bb / A#</option><option value="71">B</option></select>
+                    <select id="sel-scale"><option value="MINOR PENT">Min Pent</option><option value="PENTATONIC">Maj Pent</option><option value="MINOR">Minor</option><option value="MAJOR">Major</option><option value="BLUES">Blues</option></select>
+                    <select id="sel-rhythm"><option value="STRAIGHT">Straight</option><option value="LIGHT_SHUFFLE">Light Shuffle (54%)</option><option value="CLASSIC_MPC">Classic MPC (60%)</option><option value="SWING">Swing (67%)</option><option value="HARD_SHUFFLE">Hard Shuffle (75%)</option><option value="RUSHED">Rushed (Push)</option></select>
                 </div>
             </div>
             <div id="grid"></div>
         </div>
         <div id="right-panel">
+            <div class="panel-box"><div class="panel-title">Voice Bank</div><div id="voice-bank"></div></div>
             <div class="panel-box"><div class="panel-title">Loop Bank</div><div id="loop-bank"></div></div>
             <div class="panel-box"><div class="panel-title">Song Bank</div><div id="song-bank"></div></div>
         </div>
@@ -191,9 +180,7 @@
                 <button id="btn-remove-timeline" style="background: var(--red); padding: 5px 10px;">- TIMELINE</button>
             </div>
         </div>
-        
         <div id="timeline-container" style="display: flex; flex-direction: column; gap: 5px;"></div>
-        
         <div style="margin-top: 15px; display: flex; gap: 10px;">
             <button id="btn-save-song" style="background: var(--purple); color: #fff;">SAVE SONG</button>
             <button id="btn-clear-song">CLEAR TIMELINES</button>
@@ -202,6 +189,5 @@
 
     <script src="audioEngine.js"></script>
     <script src="app.js"></script>
-
 </body>
 </html>
