@@ -2,7 +2,7 @@ class AudioEngine {
     constructor() {
         this.ctx = new (window.AudioContext || window.webkitAudioContext)();
         
-        this.KITS = ['TECHNO', '8-BIT', 'AMBIENT', 'RETRO-WAVE', 'GLITCH-HOP', 'DEEP-DUB', 'STRINGS'];
+        this.KITS = ['TECHNO', '8-BIT', 'AMBIENT', 'RETRO-WAVE', 'GLITCH-HOP', 'DEEP-DUB', 'STRINGS', 'BEAT-BOX'];
         this.activeKitIndex = 0;
         this.SCALES = {
             'PENTATONIC': [0, 2, 4, 7, 9], 'MINOR PENT': [0, 3, 5, 7, 10],
@@ -338,7 +338,180 @@ class AudioEngine {
         const reverbG = this.ctx.createGain(); reverbG.gain.value = r; sourceNode.connect(reverbG); reverbG.connect(this.busReverb);
         const chorusG = this.ctx.createGain(); chorusG.gain.value = h; sourceNode.connect(chorusG); chorusG.connect(this.busChorus);
     }
+_playDrum(row, color, pitchIdx, volume, fx, time) {
+        const outGain = this.ctx.createGain();
+        let masterLevel = volume * 0.8;
+        
+        const preRouter = this.ctx.createGain(); preRouter.gain.value = 1;
+        outGain.connect(preRouter);
+        this._routeSignal(preRouter, fx);
 
+        const tune = Math.pow(2, pitchIdx / 12);
+        const yMod = pitchIdx; 
+        const dynDecay = Math.max(0.05, 0.8 - (yMod * 0.1));    
+        const dynSnap  = Math.max(0.02, 0.15 + (yMod * 0.03));  
+        const dynFreq  = Math.max(200, 1000 + (yMod * 150));    
+
+        // Noise Burst Generator
+        const makeNoise = (f, q, dur, vol, type='highpass') => {
+            const n = this.createNoise();
+            const filt = this.ctx.createBiquadFilter(); filt.type = type; 
+            filt.frequency.value = Math.min(f, 22000); filt.Q.value = q;
+            const env = this.ctx.createGain(); 
+            env.gain.setValueAtTime(0, time);
+            env.gain.linearRampToValueAtTime(vol*masterLevel, time + 0.005);
+            env.gain.exponentialRampToValueAtTime(0.001, time+dur);
+            n.connect(filt); filt.connect(env); env.connect(outGain);
+            n.start(time); n.stop(time+dur);
+        };
+
+        // 808/909 6-Oscillator Metallic Synthesis
+        const makeMetallic = (baseFreq, dur, vol, type='highpass', filterFreq=7000) => {
+            const filter = this.ctx.createBiquadFilter(); 
+            filter.type = type; filter.frequency.value = Math.min(filterFreq, 22000);
+            const env = this.ctx.createGain();
+            env.gain.setValueAtTime(0, time);
+            env.gain.linearRampToValueAtTime(vol * masterLevel, time + 0.005);
+            env.gain.exponentialRampToValueAtTime(0.001, time + dur);
+            filter.connect(env); env.connect(outGain);
+            
+            const ratios = [1.0, 1.48, 1.93, 2.55, 3.17, 3.87]; // Classic Roland ratios
+            ratios.forEach(r => {
+                const osc = this.ctx.createOscillator(); osc.type = 'square';
+                osc.frequency.value = Math.min(baseFreq * r * tune, 22000);
+                osc.connect(filter); osc.start(time); osc.stop(time + dur);
+            });
+        };
+
+        if (row === 0) { // KICKS
+            const osc = this.ctx.createOscillator(); osc.type = 'sine';
+            const env = this.ctx.createGain();
+            
+            if (color === 'red') { // Roland TR-808 Kick (The iconic hip-hop sub)
+                osc.frequency.setValueAtTime(150 * tune, time); 
+                osc.frequency.exponentialRampToValueAtTime(45 * tune, time + 0.05); 
+                env.gain.setValueAtTime(masterLevel, time); env.gain.exponentialRampToValueAtTime(0.001, time + (dynDecay * 2));
+            } else if (color === 'yellow') { // Roland TR-909 Kick (Punchy House kick)
+                osc.frequency.setValueAtTime(300 * tune, time); 
+                osc.frequency.exponentialRampToValueAtTime(50 * tune, time + 0.03); 
+                env.gain.setValueAtTime(masterLevel, time); env.gain.exponentialRampToValueAtTime(0.001, time + (dynDecay*0.5));
+                makeNoise(1000, 1, 0.03, 0.6, 'highpass'); 
+            } else if (color === 'blue') { // LinnDrum Style (Tight, clicky, acoustic-synth blend)
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(200 * tune, time); osc.frequency.exponentialRampToValueAtTime(60 * tune, time + 0.02);
+                env.gain.setValueAtTime(masterLevel, time); env.gain.exponentialRampToValueAtTime(0.001, time + (dynDecay*0.3));
+            } else if (color === 'green') { // Simmons SDS-V Kick (80s Synthpop Laser Kick)
+                osc.type = 'triangle'; osc.frequency.setValueAtTime(400 * tune, time); 
+                osc.frequency.exponentialRampToValueAtTime(40 * tune, time + 0.15); // Huge pitch drop
+                env.gain.setValueAtTime(masterLevel, time); env.gain.exponentialRampToValueAtTime(0.001, time + dynDecay);
+            } else { // Purple: Korg Volca FM Kick
+                osc.frequency.setValueAtTime(50 * tune, time);
+                const fm = this.ctx.createOscillator(); fm.type = 'square'; fm.frequency.setValueAtTime(300 * tune, time); fm.frequency.exponentialRampToValueAtTime(10 * tune, time+0.05);
+                const fmGain = this.ctx.createGain(); fmGain.gain.value = 500 + (yMod * 100); 
+                fm.connect(fmGain); fmGain.connect(osc.frequency);
+                env.gain.setValueAtTime(masterLevel, time); env.gain.exponentialRampToValueAtTime(0.001, time + dynDecay);
+                fm.start(time); fm.stop(time+dynDecay);
+            }
+            osc.connect(env); env.connect(outGain); osc.start(time); osc.stop(time + 2.0);
+
+        } else if (row === 1) { // SNARES / CLAPS
+            const bodyOsc = this.ctx.createOscillator(); bodyOsc.type = 'triangle';
+            const bodyEnv = this.ctx.createGain();
+            bodyOsc.connect(bodyEnv); bodyEnv.connect(outGain);
+
+            if (color === 'red') { // TR-808 Snare (Tonal ping + white noise)
+                bodyOsc.frequency.setValueAtTime(250 * tune, time); bodyOsc.frequency.exponentialRampToValueAtTime(150 * tune, time+0.05);
+                bodyEnv.gain.setValueAtTime(masterLevel * 0.6, time); bodyEnv.gain.exponentialRampToValueAtTime(0.001, time+0.1);
+                makeNoise(dynFreq, 1, dynSnap * 1.5, 0.8, 'highpass'); 
+            } else if (color === 'yellow') { // TR-808 Clap (Iconic staggered noise bursts)
+                makeNoise(1000, 1, dynSnap*0.2, 0.7, 'bandpass'); 
+                setTimeout(() => makeNoise(1000, 1, dynSnap*0.2, 0.7, 'bandpass'), 10); 
+                setTimeout(() => makeNoise(1000, 1, dynSnap*0.3, 0.7, 'bandpass'), 20); 
+                setTimeout(() => makeNoise(1000, 1, dynSnap, 0.6, 'bandpass'), 30); // Main tail
+                bodyOsc.disconnect(); // No tonal body for clap
+            } else if (color === 'blue') { // TR-909 Snare (Lower pitch, harder noise)
+                bodyOsc.frequency.setValueAtTime(180 * tune, time); bodyOsc.frequency.exponentialRampToValueAtTime(100 * tune, time+0.05);
+                bodyEnv.gain.setValueAtTime(masterLevel * 0.8, time); bodyEnv.gain.exponentialRampToValueAtTime(0.001, time+0.1);
+                makeNoise(dynFreq*0.5, 1, dynSnap*1.2, 1.0, 'highpass');
+            } else if (color === 'green') { // LinnDrum Rimshot (Acoustic clack)
+                bodyOsc.type = 'square'; bodyOsc.frequency.setValueAtTime(800 * tune, time); bodyOsc.frequency.exponentialRampToValueAtTime(350 * tune, time+0.02);
+                const filter = this.ctx.createBiquadFilter(); filter.type = 'bandpass'; filter.frequency.value = 600 * tune;
+                bodyEnv.gain.setValueAtTime(masterLevel, time); bodyEnv.gain.exponentialRampToValueAtTime(0.001, time+0.05);
+                bodyOsc.disconnect(); bodyOsc.connect(filter); filter.connect(bodyEnv);
+            } else { // Purple: Simmons SDS-V Snare (The 80s "Pew" snare)
+                bodyOsc.type = 'sawtooth'; bodyOsc.frequency.setValueAtTime(1500 * tune, time); bodyOsc.frequency.exponentialRampToValueAtTime(150 * tune, time+0.1);
+                bodyEnv.gain.setValueAtTime(masterLevel, time); bodyEnv.gain.exponentialRampToValueAtTime(0.001, time+0.15);
+                makeNoise(dynFreq*1.5, 1, dynSnap*0.8, 0.6, 'highpass');
+            }
+            bodyOsc.start(time); bodyOsc.stop(time+0.5);
+
+        } else if (row === 2) { // HATS (Red/Yellow use authentic Roland analog architecture)
+            if (color === 'red') { makeMetallic(350, dynSnap*0.4, 0.7, 'highpass', dynFreq*3); } // TR-808 Closed Hat
+            else if (color === 'yellow') { makeMetallic(350, dynSnap*2.5, 0.7, 'highpass', dynFreq*2); } // TR-808 Open Hat
+            else if (color === 'blue') { makeNoise(7000, 1, dynSnap*0.3, 0.6, 'highpass'); } // TR-909 style digital sample emulation
+            else if (color === 'green') { makeNoise(4000, 5, dynSnap, 0.6, 'bandpass'); } // CR-78 Tambourine
+            else { makeMetallic(800, dynSnap*0.2, 0.8, 'highpass', 9000); } // Purple: Korg Minipops Tick
+
+        } else if (row === 3) { // FX ROW (Toms & Percussion)
+            const osc = this.ctx.createOscillator(); osc.type = 'sine';
+            const env = this.ctx.createGain();
+            osc.connect(env); env.connect(outGain);
+            
+            const tf = 200 * tune; 
+            const bendTime = Math.max(0.05, 0.15 - (yMod * 0.02)); 
+            
+            if (color === 'red') { // TR-808 Low Tom
+                osc.frequency.setValueAtTime(tf*0.5, time); osc.frequency.exponentialRampToValueAtTime(tf*0.25, time+bendTime);
+                env.gain.setValueAtTime(masterLevel, time); env.gain.exponentialRampToValueAtTime(0.001, time+(bendTime*3));
+            } else if (color === 'yellow') { // TR-808 High Tom
+                osc.frequency.setValueAtTime(tf*1.5, time); osc.frequency.exponentialRampToValueAtTime(tf*0.75, time+bendTime);
+                env.gain.setValueAtTime(masterLevel, time); env.gain.exponentialRampToValueAtTime(0.001, time+(bendTime*2));
+            } else if (color === 'blue') { // Simmons SDS-V Tom
+                osc.type = 'triangle'; osc.frequency.setValueAtTime(tf*4, time); 
+                osc.frequency.exponentialRampToValueAtTime(tf*0.5, time+0.2); 
+                env.gain.setValueAtTime(masterLevel, time); env.gain.exponentialRampToValueAtTime(0.001, time+0.3);
+                makeNoise(2000, 1, 0.05, 0.4, 'highpass'); 
+            } else if (color === 'green') { // TR-808 Clave (Moved to Green)
+                osc.frequency.setValueAtTime(2500 * tune, time);
+                env.gain.setValueAtTime(masterLevel, time); env.gain.exponentialRampToValueAtTime(0.001, time+0.05);
+            } else { // Purple: TR-808 Cowbell (Restored to its rightful place)
+                osc.type = 'square'; const osc2 = this.ctx.createOscillator(); osc2.type = 'square';
+                osc.frequency.value = 800 * tune; osc2.frequency.value = 540 * tune;
+                const filt = this.ctx.createBiquadFilter(); filt.type = 'bandpass'; filt.frequency.value = 1000 * tune;
+                osc.disconnect(); osc.connect(filt); osc2.connect(filt); filt.connect(env);
+                env.gain.setValueAtTime(masterLevel*0.6, time); env.gain.exponentialRampToValueAtTime(0.001, time+0.3);
+                osc2.start(time); osc2.stop(time+0.4);
+            }
+            osc.start(time); osc.stop(time+1.0);
+
+        } else if (row === 4) { // CYMBALS / FX ("Vocals" Row)
+            if (color === 'red') { // TR-909 Crash Cymbal
+                makeMetallic(250, dynDecay*2.5, 0.7, 'highpass', 4000); 
+                makeNoise(3000, 1, dynDecay*2.0, 0.3, 'highpass'); 
+            } else if (color === 'yellow') { // TR-808 Cymbal
+                makeMetallic(350, dynDecay*1.5, 0.6, 'bandpass', 6000);
+            } else if (color === 'blue') { // TR-808 Maracas
+                makeNoise(6000, 1, 0.05, 0.5, 'highpass');
+                setTimeout(() => makeNoise(6000, 1, 0.05, 0.3, 'highpass'), 30);
+            } else if (color === 'green') { // Dub Reggae Siren (LFO modulated synth)
+                const osc = this.ctx.createOscillator(); osc.type = 'square';
+                const lfo = this.ctx.createOscillator(); lfo.type = 'sine'; lfo.frequency.value = 5 + yMod; // Speed changes with Y-axis
+                const lfoGain = this.ctx.createGain(); lfoGain.gain.value = 400; // Pitch bend depth
+                lfo.connect(lfoGain); lfoGain.connect(osc.frequency);
+                osc.frequency.setValueAtTime(800 * tune, time);
+                const env = this.ctx.createGain(); env.gain.setValueAtTime(masterLevel*0.5, time); env.gain.linearRampToValueAtTime(0.001, time+dynDecay*2);
+                osc.connect(env); env.connect(outGain); osc.start(time); lfo.start(time); osc.stop(time+2.0); lfo.stop(time+2.0);
+            } else if (color === 'purple') { // REPLACED: Kraftwerk "Pocket Calculator" Zap
+                const osc = this.ctx.createOscillator(); osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(Math.min(4000 * tune, 22000), time); 
+                osc.frequency.exponentialRampToValueAtTime(50, time+0.1);
+                const env = this.ctx.createGain(); env.gain.setValueAtTime(masterLevel, time); env.gain.exponentialRampToValueAtTime(0.001, time+0.15);
+                osc.connect(env); env.connect(outGain); osc.start(time); osc.stop(time+0.2);
+            }
+        }
+        
+        setTimeout(() => { try { outGain.disconnect(); preRouter.disconnect(); } catch(e){} }, 3000);
+    }
     playNote(row, color, pitchIdx, volume, fx, time, kitOverride) {
         if (volume <= 0) return;
         const kit = kitOverride || this.KITS[this.activeKitIndex]; 
@@ -348,14 +521,21 @@ class AudioEngine {
             this._playString(row, color, baseFreq, volume, fx, time);
             return;
         }
+        
+        if (kit === 'BEAT-BOX') {
+            // Pass pitchIdx instead of baseFreq so drums tune relative to the block, not the global scale
+            this._playDrum(row, color, pitchIdx, volume, fx, time);
+            return;
+        }
 
         const osc = this.ctx.createOscillator(); const filter = this.ctx.createBiquadFilter(); const gain = this.ctx.createGain();
         osc.frequency.value = baseFreq; 
-        osc.detune.value = (Math.random() * 10) - 5; 
         osc.connect(filter); filter.connect(gain);
         
-        this._routeSignal(gain, fx);
-
+        // Prevent double-routing and graph leaks if Row 4 is going to build its own voices
+        if (row !== 4) {
+            this._routeSignal(gain, fx);
+        }
         if (row === 0) { 
             if (color === 'red') { 
                 if (kit === 'TECHNO') { osc.type = 'sine'; osc.frequency.setValueAtTime(150, time); osc.frequency.exponentialRampToValueAtTime(40, time+0.1); gain.gain.setValueAtTime(1.5*volume, time); gain.gain.exponentialRampToValueAtTime(0.01, time+0.4); osc.start(time); osc.stop(time+0.4); }

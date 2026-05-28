@@ -143,7 +143,6 @@ class JamBoardCore {
             const newKit = this.audio.cycleKit();
             e.target.innerText = `ACTIVE KIT: ${newKit}`; 
             
-            // Sync all blocks currently on the live grid to the new kit
             document.querySelectorAll('#grid .block').forEach(b => {
                 b.dataset.kit = newKit;
                 b.title = newKit;
@@ -165,9 +164,24 @@ class JamBoardCore {
         });
 
         document.body.addEventListener('dragover', e => e.preventDefault());
+        
         document.body.addEventListener('drop', e => {
+            e.preventDefault(); 
+            e.stopPropagation();
             if (e.dataTransfer.getData('source') === 'grid' && !e.target.closest('.cell') && !e.target.closest('.row-fx-slot')) {
-                const dragging = document.querySelector('.dragging'); if (dragging) { dragging.remove(); }
+                const dragging = document.querySelector('.dragging'); 
+                if (dragging) {
+                    const parent = dragging.parentElement;
+                    const type = dragging.dataset.type;
+                    const fxType = dragging.dataset.fx;
+                    setTimeout(() => {
+                        dragging.remove();
+                        if (parent) {
+                            if (type === 'fx') this.layoutFxTokens(parent, fxType);
+                            if (type === 'block') this.layoutBlocks(parent);
+                        }
+                    }, 0); 
+                }
             }
         });
     }
@@ -195,10 +209,10 @@ class JamBoardCore {
             let crush = 0; let echo = 0; let reverb = 0; let chorus = 0;
             const rowFxEls = document.querySelectorAll(`.row-fx-slot[data-row="${r}"] .fx-token`);
             rowFxEls.forEach(el => { 
-                if(el.dataset.fx === 'crush') crush = parseFloat(el.dataset.amount); 
-                if(el.dataset.fx === 'echo') echo = parseFloat(el.dataset.amount); 
-                if(el.dataset.fx === 'reverb') reverb = parseFloat(el.dataset.amount); 
-                if(el.dataset.fx === 'chorus') chorus = parseFloat(el.dataset.amount); 
+                if(el.dataset.fx === 'crush') crush += parseFloat(el.dataset.amount); 
+                if(el.dataset.fx === 'echo') echo += parseFloat(el.dataset.amount); 
+                if(el.dataset.fx === 'reverb') reverb += parseFloat(el.dataset.amount); 
+                if(el.dataset.fx === 'chorus') chorus += parseFloat(el.dataset.amount); 
             });
             snapshot.rowFx.push({ crush, echo, reverb, chorus });
         }
@@ -218,10 +232,10 @@ class JamBoardCore {
                 let crush = 0; let echo = 0; let reverb = 0; let chorus = 0;
                 const blockFxEls = cell.querySelectorAll('.fx-token');
                 blockFxEls.forEach(el => { 
-                    if(el.dataset.fx === 'crush') crush = parseFloat(el.dataset.amount); 
-                    if(el.dataset.fx === 'echo') echo = parseFloat(el.dataset.amount); 
-                    if(el.dataset.fx === 'reverb') reverb = parseFloat(el.dataset.amount); 
-                    if(el.dataset.fx === 'chorus') chorus = parseFloat(el.dataset.amount); 
+                    if(el.dataset.fx === 'crush') crush += parseFloat(el.dataset.amount); 
+                    if(el.dataset.fx === 'echo') echo += parseFloat(el.dataset.amount); 
+                    if(el.dataset.fx === 'reverb') reverb += parseFloat(el.dataset.amount); 
+                    if(el.dataset.fx === 'chorus') chorus += parseFloat(el.dataset.amount); 
                 });
 
                 stepData.push({ blocks, cellFx: { crush, echo, reverb, chorus } });
@@ -326,13 +340,23 @@ class JamBoardCore {
 
         const loop = this.loopMemory[loopId];
 
+        const buildFx = (target, type, totalAmt) => {
+            let amt = totalAmt;
+            while(amt > 0) {
+                let val = Math.min(1.0, amt);
+                target.appendChild(this.createFxDOM(type, val));
+                amt -= val;
+            }
+            if (totalAmt > 0) this.layoutFxTokens(target, type);
+        };
+
         for (let r = 0; r < this.rows.length; r++) {
             const rFx = loop.rowFx[r];
             const slot = document.querySelector(`.row-fx-slot[data-row="${r}"]`);
-            if (rFx.crush > 0) slot.appendChild(this.createFxDOM('crush', rFx.crush));
-            if (rFx.echo > 0) slot.appendChild(this.createFxDOM('echo', rFx.echo));
-            if (rFx.reverb > 0) slot.appendChild(this.createFxDOM('reverb', rFx.reverb));
-            if (rFx.chorus > 0) slot.appendChild(this.createFxDOM('chorus', rFx.chorus));
+            if (rFx.crush > 0) buildFx(slot, 'crush', rFx.crush);
+            if (rFx.echo > 0) buildFx(slot, 'echo', rFx.echo);
+            if (rFx.reverb > 0) buildFx(slot, 'reverb', rFx.reverb);
+            if (rFx.chorus > 0) buildFx(slot, 'chorus', rFx.chorus);
         }
 
         for (let step = 0; step < this.STEPS; step++) {
@@ -343,11 +367,12 @@ class JamBoardCore {
                 cellData.blocks.forEach(b => {
                     cell.appendChild(this.createBlockDOM(b.color, b.pitch, b.volume, b.kit));
                 });
+                this.layoutBlocks(cell);
                 
-                if (cellData.cellFx.crush > 0) cell.appendChild(this.createFxDOM('crush', cellData.cellFx.crush));
-                if (cellData.cellFx.echo > 0) cell.appendChild(this.createFxDOM('echo', cellData.cellFx.echo));
-                if (cellData.cellFx.reverb > 0) cell.appendChild(this.createFxDOM('reverb', cellData.cellFx.reverb));
-                if (cellData.cellFx.chorus > 0) cell.appendChild(this.createFxDOM('chorus', cellData.cellFx.chorus));
+                if (cellData.cellFx.crush > 0) buildFx(cell, 'crush', cellData.cellFx.crush);
+                if (cellData.cellFx.echo > 0) buildFx(cell, 'echo', cellData.cellFx.echo);
+                if (cellData.cellFx.reverb > 0) buildFx(cell, 'reverb', cellData.cellFx.reverb);
+                if (cellData.cellFx.chorus > 0) buildFx(cell, 'chorus', cellData.cellFx.chorus);
             }
         }
     }
@@ -404,6 +429,39 @@ class JamBoardCore {
         } else { block.style.borderColor = 'transparent'; }
     }
 
+    layoutBlocks(target) {
+        if (!target.classList.contains('cell')) return;
+        const blocks = target.querySelectorAll('.block');
+        const count = blocks.length;
+        if (count === 0) return;
+        const h = 100 / count; 
+        blocks.forEach((b, i) => {
+            b.style.position = 'absolute';
+            b.style.height = `calc(${h}% - 10px)`; 
+            b.style.width = 'calc(100% - 36px)'; 
+            b.style.left = '18px'; 
+            b.style.bottom = `calc(${i * h}% + 5px)`;
+        });
+    }
+
+    layoutFxTokens(target, fxData) {
+        const tokens = target.querySelectorAll(`.fx-token[data-fx="${fxData}"]`);
+        const count = tokens.length;
+        if (count === 0) return;
+        const h = 35 / count; 
+        tokens.forEach((t, i) => {
+            t.style.height = `${h}px`;
+            t.style.zIndex = '3'; // Fixes the overlap issue by forcing FX above blocks
+            if (fxData === 'crush' || fxData === 'reverb') {
+                t.style.top = `${5 + (i * h)}px`;
+                t.style.bottom = 'auto';
+            } else {
+                t.style.bottom = `${5 + (i * h)}px`;
+                t.style.top = 'auto';
+            }
+        });
+    }
+
     createBlockDOM(color, pitch, volume = 1.0, kit = null) {
         const block = document.createElement('div'); block.className = 'block'; 
         block.dataset.type = 'block'; block.dataset.color = color; 
@@ -415,7 +473,12 @@ class JamBoardCore {
         this.updateBlockVisuals(block, volume);
         
         block.addEventListener('click', (e) => { 
-            if (e.shiftKey) { block.remove(); return; } 
+            if (e.shiftKey) { 
+                const parent = block.parentElement;
+                block.remove(); 
+                if (parent) this.layoutBlocks(parent);
+                return; 
+            } 
             if (e.ctrlKey || e.metaKey) {
                 let v = parseFloat(block.dataset.volume); v = v - 0.25; if(v < 0) v = 2.0;
                 block.dataset.volume = v.toFixed(2); this.updateBlockVisuals(block, v); return;
@@ -447,9 +510,15 @@ class JamBoardCore {
     createFxDOM(fxType, amount = 1.0) {
         const token = document.createElement('div'); token.className = 'fx-token'; token.dataset.type = 'fx'; token.dataset.fx = fxType; token.dataset.amount = amount; token.draggable = true;
         token.innerHTML = `<div class="fx-bar" style="height: ${amount * 100}%"></div><span class="fx-label">${fxType.toUpperCase()}</span>`;
+        token.style.zIndex = '3';
         
         token.addEventListener('click', (e) => { 
-            if (e.shiftKey) { token.remove(); return; } 
+            if (e.shiftKey) { 
+                const parent = token.parentElement;
+                token.remove(); 
+                if (parent) this.layoutFxTokens(parent, fxType);
+                return; 
+            } 
             let a = parseFloat(token.dataset.amount); a = a - 0.25; if(a < 0) a = 1.0;
             token.dataset.amount = a.toFixed(2); token.querySelector('.fx-bar').style.height = `${a * 100}%`;
         });
@@ -470,13 +539,20 @@ class JamBoardCore {
         const dragging = document.querySelector('.dragging');
         
         if (source === 'grid' && dragging) {
+            const oldParent = dragging.parentElement;
             if (target.classList.contains('cell') || target.classList.contains('row-fx-slot')) {
-                if (type === 'fx') { 
-                    target.querySelectorAll(`.fx-token[data-fx="${dragging.dataset.fx}"]`).forEach(el => {
-                        if (el !== dragging) el.remove(); 
-                    });
-                } 
-                target.appendChild(dragging);
+                // Defer DOM reparenting by 1 frame to prevent browser drag-state lockups
+                setTimeout(() => {
+                    target.appendChild(dragging);
+                    if (type === 'fx') {
+                        this.layoutFxTokens(target, dragging.dataset.fx);
+                        if (oldParent) this.layoutFxTokens(oldParent, dragging.dataset.fx);
+                    }
+                    if (type === 'block') {
+                        this.layoutBlocks(target);
+                        if (oldParent) this.layoutBlocks(oldParent);
+                    }
+                }, 0);
             } 
             return;
         }
@@ -486,16 +562,17 @@ class JamBoardCore {
                 if (type === 'block') { 
                     const activeKit = this.audio.KITS[this.audio.activeKitIndex];
                     target.appendChild(this.createBlockDOM(e.dataTransfer.getData('color'), 0, 1.0, activeKit)); 
+                    this.layoutBlocks(target);
                 } 
                 else if (type === 'fx') {
                     const fxData = e.dataTransfer.getData('fx'); 
-                    target.querySelectorAll(`.fx-token[data-fx="${fxData}"]`).forEach(el => el.remove());
                     target.appendChild(this.createFxDOM(fxData, 1.0));
+                    this.layoutFxTokens(target, fxData);
                 }
             } else if (target.classList.contains('row-fx-slot') && type === 'fx') { 
                 const fxData = e.dataTransfer.getData('fx'); 
-                target.querySelectorAll(`.fx-token[data-fx="${fxData}"]`).forEach(el => el.remove());
                 target.appendChild(this.createFxDOM(fxData, 1.0)); 
+                this.layoutFxTokens(target, fxData);
             }
         }
     }
@@ -548,8 +625,18 @@ class JamBoardCore {
             this.processStep(this.currentStep, this.nextNoteTime); 
             
             let stepDur = this.stepTime;
-            if (this.activeRhythm === 'SWING') { stepDur = (this.currentStep % 2 === 0) ? this.stepTime * 1.33 : this.stepTime * 0.67; } 
-            else if (this.activeRhythm === 'HEAVY_SWING') { stepDur = (this.currentStep % 2 === 0) ? this.stepTime * 1.5 : this.stepTime * 0.5; }
+            
+            if (this.activeRhythm === 'LIGHT_SHUFFLE') { 
+                stepDur = (this.currentStep % 2 === 0) ? this.stepTime * 1.08 : this.stepTime * 0.92;
+            } else if (this.activeRhythm === 'CLASSIC_MPC') { 
+                stepDur = (this.currentStep % 2 === 0) ? this.stepTime * 1.20 : this.stepTime * 0.80;
+            } else if (this.activeRhythm === 'SWING') { 
+                stepDur = (this.currentStep % 2 === 0) ? this.stepTime * 1.34 : this.stepTime * 0.66;
+            } else if (this.activeRhythm === 'HARD_SHUFFLE') { 
+                stepDur = (this.currentStep % 2 === 0) ? this.stepTime * 1.50 : this.stepTime * 0.50;
+            } else if (this.activeRhythm === 'RUSHED') { 
+                stepDur = (this.currentStep % 2 === 0) ? this.stepTime * 0.90 : this.stepTime * 1.10;
+            }
             
             this.nextNoteTime += stepDur; 
             this.currentStep = (this.currentStep + 1) % this.STEPS;
@@ -585,16 +672,16 @@ class JamBoardCore {
                 
                 let crush = 0; let echo = 0; let reverb = 0; let chorus = 0;
                 document.querySelectorAll(`.row-fx-slot[data-row="${r}"] .fx-token`).forEach(el => {
-                    if(el.dataset.fx === 'crush') crush = Math.max(crush, parseFloat(el.dataset.amount));
-                    if(el.dataset.fx === 'echo') echo = Math.max(echo, parseFloat(el.dataset.amount));
-                    if(el.dataset.fx === 'reverb') reverb = Math.max(reverb, parseFloat(el.dataset.amount));
-                    if(el.dataset.fx === 'chorus') chorus = Math.max(chorus, parseFloat(el.dataset.amount));
+                    if(el.dataset.fx === 'crush') crush += parseFloat(el.dataset.amount);
+                    if(el.dataset.fx === 'echo') echo += parseFloat(el.dataset.amount);
+                    if(el.dataset.fx === 'reverb') reverb += parseFloat(el.dataset.amount);
+                    if(el.dataset.fx === 'chorus') chorus += parseFloat(el.dataset.amount);
                 });
                 this.cells[r][step].querySelectorAll('.fx-token').forEach(el => {
-                    if(el.dataset.fx === 'crush') crush = Math.max(crush, parseFloat(el.dataset.amount));
-                    if(el.dataset.fx === 'echo') echo = Math.max(echo, parseFloat(el.dataset.amount));
-                    if(el.dataset.fx === 'reverb') reverb = Math.max(reverb, parseFloat(el.dataset.amount));
-                    if(el.dataset.fx === 'chorus') chorus = Math.max(chorus, parseFloat(el.dataset.amount));
+                    if(el.dataset.fx === 'crush') crush += parseFloat(el.dataset.amount);
+                    if(el.dataset.fx === 'echo') echo += parseFloat(el.dataset.amount);
+                    if(el.dataset.fx === 'reverb') reverb += parseFloat(el.dataset.amount);
+                    if(el.dataset.fx === 'chorus') chorus += parseFloat(el.dataset.amount);
                 });
 
                 blocks.forEach(block => {
@@ -613,10 +700,10 @@ class JamBoardCore {
                             if (colData[r].blocks) {
                                 colData[r].blocks.forEach(b => { 
                                     const fx = { 
-                                        crush: Math.max(rowFx.crush, colData[r].cellFx.crush), 
-                                        echo: Math.max(rowFx.echo, colData[r].cellFx.echo),
-                                        reverb: Math.max(rowFx.reverb, colData[r].cellFx.reverb),
-                                        chorus: Math.max(rowFx.chorus, colData[r].cellFx.chorus)
+                                        crush: rowFx.crush + colData[r].cellFx.crush, 
+                                        echo: rowFx.echo + colData[r].cellFx.echo,
+                                        reverb: rowFx.reverb + colData[r].cellFx.reverb,
+                                        chorus: rowFx.chorus + colData[r].cellFx.chorus
                                     };
                                     this.audio.playNote(r, b.color, b.pitch, this.rowVolumes[r] * (b.volume || 1.0), fx, time, b.kit); 
                                 }); 
@@ -638,7 +725,6 @@ class JamBoardCore {
         document.querySelectorAll('.cell').forEach(c => c.classList.remove('active')); 
         document.querySelectorAll('.timeline-slot').forEach(s => s.classList.remove('active-macro')); 
         
-        // This ensures your custom jam session isn't deleted when you press Stop
         if (wasSongMode) {
             if (this.editingLoopId !== null) {
                 this.displayLoopVisualOnly(this.editingLoopId);
