@@ -45,12 +45,40 @@ class AudioEngine {
         this.busReverb.connect(this.convolver); this.convolver.connect(this.masterCompressor);
 
         this.busChorus = this.ctx.createGain();
-        this.chorusDelay = this.ctx.createDelay(); this.chorusDelay.delayTime.value = 0.03;
-        this.chorusLFO = this.ctx.createOscillator(); this.chorusLFO.type = 'sine'; this.chorusLFO.frequency.value = 1.5;
-        this.chorusGain = this.ctx.createGain(); this.chorusGain.gain.value = 0.005;
-        this.chorusLFO.connect(this.chorusGain); this.chorusGain.connect(this.chorusDelay.delayTime);
-        this.chorusLFO.start();
-        this.busChorus.connect(this.chorusDelay); this.chorusDelay.connect(this.masterCompressor);
+        
+        const chorusFilter = this.ctx.createBiquadFilter();
+        chorusFilter.type = 'lowpass';
+        chorusFilter.frequency.value = 6000; 
+        
+        this.chorusDelay1 = this.ctx.createDelay(); this.chorusDelay1.delayTime.value = 0.015;
+        this.chorusDelay2 = this.ctx.createDelay(); this.chorusDelay2.delayTime.value = 0.025;
+        this.chorusDelay3 = this.ctx.createDelay(); this.chorusDelay3.delayTime.value = 0.035; 
+        
+        this.chorusLFO1 = this.ctx.createOscillator(); this.chorusLFO1.type = 'sine'; this.chorusLFO1.frequency.value = 1.2; 
+        this.chorusLFO2 = this.ctx.createOscillator(); this.chorusLFO2.type = 'sine'; this.chorusLFO2.frequency.value = 1.8; 
+        this.chorusLFO3 = this.ctx.createOscillator(); this.chorusLFO3.type = 'sine'; this.chorusLFO3.frequency.value = 2.5; 
+        
+        this.chorusGain1 = this.ctx.createGain(); this.chorusGain1.gain.value = 0.006;
+        this.chorusGain2 = this.ctx.createGain(); this.chorusGain2.gain.value = 0.008; 
+        this.chorusGain3 = this.ctx.createGain(); this.chorusGain3.gain.value = 0.010; 
+        
+        this.chorusLFO1.connect(this.chorusGain1); this.chorusGain1.connect(this.chorusDelay1.delayTime);
+        this.chorusLFO2.connect(this.chorusGain2); this.chorusGain2.connect(this.chorusDelay2.delayTime);
+        this.chorusLFO3.connect(this.chorusGain3); this.chorusGain3.connect(this.chorusDelay3.delayTime);
+        
+        this.chorusLFO1.start(); this.chorusLFO2.start(); this.chorusLFO3.start();
+        
+        const chorusOut = this.ctx.createGain(); chorusOut.gain.value = 1.0; 
+        
+        this.busChorus.connect(chorusFilter);
+        chorusFilter.connect(this.chorusDelay1);
+        chorusFilter.connect(this.chorusDelay2);
+        chorusFilter.connect(this.chorusDelay3);
+        
+        this.chorusDelay1.connect(chorusOut); 
+        this.chorusDelay2.connect(chorusOut); 
+        this.chorusDelay3.connect(chorusOut); 
+        chorusOut.connect(this.masterCompressor);
 
         this.noiseBuffer = this.ctx.createBuffer(1, this.ctx.sampleRate * 2, this.ctx.sampleRate);
         const output = this.noiseBuffer.getChannelData(0); 

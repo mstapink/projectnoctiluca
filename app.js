@@ -23,6 +23,7 @@ class JamBoardCore {
         this.activeRhythm = 'STRAIGHT';
         
         this.editingLoopId = null;
+        this.editingSongId = null;
         
         this.colorMap = { 'red': 'rgba(255, 51, 102, 0.4)', 'yellow': 'rgba(255, 204, 0, 0.4)', 'blue': 'rgba(0, 204, 255, 0.4)', 'green': 'rgba(51, 255, 102, 0.4)', 'purple': 'rgba(204, 51, 255, 0.4)' };
         this.solidColors = { 'red': '#ff3366', 'yellow': '#ffcc00', 'blue': '#00ccff', 'green': '#33ff66', 'purple': '#cc33ff', 'voice': '#aaa' };
@@ -77,7 +78,7 @@ class JamBoardCore {
 
         this.buildTimelineRow();
 
-        document.querySelectorAll('#palette > div[draggable="true"]').forEach(el => { 
+        document.querySelectorAll('#palette .block, #palette .fx-token').forEach(el => { 
             el.addEventListener('dragstart', e => { 
                 e.dataTransfer.setData('source', 'palette'); e.dataTransfer.setData('type', el.dataset.type);
                 if (el.dataset.type === 'block') { e.dataTransfer.setData('color', el.dataset.color); } 
@@ -102,10 +103,9 @@ class JamBoardCore {
                         if (dragging && dragging.classList.contains('loop-token')) {
                             const clone = dragging.cloneNode(true);
                             clone.classList.remove('dragging');
-                            clone.addEventListener('click', (ev) => { if(ev.shiftKey) clone.remove(); });
+                            clone.addEventListener('click', (ev) => { if(ev.shiftKey || ev.ctrlKey || ev.metaKey) clone.remove(); });
                             clone.addEventListener('dblclick', () => { this.loadLoopToGrid(clone.dataset.loopId); });
                             
-                            // DEFERRED: Prevents drag-lock when building song sequences
                             setTimeout(() => {
                                 slot.innerHTML = '';
                                 slot.appendChild(clone);
@@ -171,8 +171,12 @@ class JamBoardCore {
         document.getElementById('btn-kit').addEventListener('click', (e) => { 
             const newKit = this.audio.cycleKit();
             e.target.innerText = `ACTIVE KIT: ${newKit}`; 
+            
             document.querySelectorAll('#grid .block').forEach(b => {
-                if (b.dataset.type === 'block') { b.dataset.kit = newKit; b.title = newKit; }
+                if (b.dataset.type === 'block') { 
+                    b.dataset.kit = newKit;
+                    b.title = newKit;
+                }
             });
         });
 
@@ -191,6 +195,7 @@ class JamBoardCore {
                         const blob = new Blob(chunks, { type: 'audio/webm' });
                         const arrayBuffer = await blob.arrayBuffer();
                         const rawBuffer = await this.audio.ctx.decodeAudioData(arrayBuffer);
+                        
                         const audioBuffer = this.audio.trimVoiceBuffer(rawBuffer);
                         
                         if (!this.audio.voiceBuffers) this.audio.voiceBuffers = [];
@@ -219,15 +224,18 @@ class JamBoardCore {
         document.getElementById('btn-save').addEventListener('click', () => this.saveLoop());
         document.getElementById('btn-save-new').addEventListener('click', () => this.saveLoop(true));
         
+        document.getElementById('btn-save-song').addEventListener('click', () => this.saveSong());
+        document.getElementById('btn-save-song-new').addEventListener('click', () => this.saveSong(true));
+        
         document.getElementById('btn-add-timeline').addEventListener('click', () => this.buildTimelineRow());
         document.getElementById('btn-remove-timeline').addEventListener('click', () => {
             const rows = document.querySelectorAll('.timeline-row');
             if (rows.length > 1) rows[rows.length - 1].remove();
         });
 
-        document.getElementById('btn-save-song').addEventListener('click', () => this.saveSong());
         document.getElementById('btn-clear-song').addEventListener('click', () => {
             document.querySelectorAll('.timeline-slot').forEach(slot => slot.innerHTML = '');
+            this.resetSongEditMode();
         });
 
         document.body.addEventListener('dragover', e => e.preventDefault());
@@ -235,7 +243,9 @@ class JamBoardCore {
         document.body.addEventListener('drop', e => {
             e.preventDefault(); e.stopPropagation();
             const source = e.dataTransfer.getData('source');
-            if ((source === 'grid' || source === 'voice-bank') && !e.target.closest('.cell') && !e.target.closest('.row-fx-slot')) {
+            const validSources = ['grid', 'voice-bank', 'bank', 'song-bank'];
+            
+            if (validSources.includes(source) && !e.target.closest('.cell') && !e.target.closest('.row-fx-slot') && !e.target.closest('.timeline-slot')) {
                 const dragging = document.querySelector('.dragging');
                 if (dragging) { 
                     const parent = dragging.parentElement;
@@ -249,11 +259,16 @@ class JamBoardCore {
                             const existing = document.querySelector(`#voice-bank .voice-block[data-vid="${vid}"]`);
                             if (!existing) this.createVoiceBankToken(vid);
                         }
+                        
                         dragging.remove();
-                        if (parent) {
+                        
+                        if (parent && source === 'grid') {
                             if (type === 'fx') this.layoutFxTokens(parent, fxType);
                             if (type === 'block' || type === 'voice') this.layoutBlocks(parent);
                         }
+
+                        if (source === 'bank') this.loopMemory[dragging.dataset.loopId] = null;
+                        if (source === 'song-bank') this.songMemory[dragging.dataset.songId] = null;
                     }, 0); 
                 }
             }
@@ -275,6 +290,11 @@ class JamBoardCore {
 
     saveLoop(asNew = false) {
         const snapshot = {
+            bpm: this.BPM,
+            key: this.audio.activeKey,
+            scale: this.audio.activeScale,
+            rhythm: this.activeRhythm,
+            kitIndex: this.audio.activeKitIndex,
             steps: [],
             rowFx: [],
             voiceRowFx: []
@@ -331,7 +351,9 @@ class JamBoardCore {
             const loopId = this.loopMemory.length;
             this.loopMemory.push(snapshot);
             this.createLoopToken(loopId, snapshot);
-            if (asNew) this.resetEditMode();
+            if (asNew) {
+                this.resetEditMode();
+            }
         }
     }
 
@@ -340,8 +362,17 @@ class JamBoardCore {
         const miniColContainer = document.createElement('div'); miniColContainer.className = 'mini-container'; miniColContainer.style.display = 'flex'; miniColContainer.style.width = '100%'; miniColContainer.style.height = '100%'; miniColContainer.style.gap = '1px';
         this.generateTokenVisuals(snapshot, miniColContainer);
         token.appendChild(miniColContainer);
+        
         token.addEventListener('dragstart', e => { e.dataTransfer.setData('source', 'bank'); e.dataTransfer.setData('loopId', loopId); setTimeout(() => token.classList.add('dragging'), 0); });
         token.addEventListener('dragend', () => token.classList.remove('dragging')); 
+        
+        token.addEventListener('click', e => {
+            if (e.shiftKey || e.ctrlKey || e.metaKey) {
+                token.remove();
+                this.loopMemory[loopId] = null;
+            }
+        });
+        
         token.addEventListener('dblclick', () => { this.loadLoopToGrid(loopId); });
         document.getElementById('loop-bank').appendChild(token);
     }
@@ -351,31 +382,117 @@ class JamBoardCore {
         tokens.forEach(token => { const container = token.querySelector('.mini-container'); this.generateTokenVisuals(snapshot, container); });
     }
 
-    saveSong() {
-        const seqs = this.getTimelineSequences(); const songId = this.songMemory.length; this.songMemory.push(seqs);
-        const token = document.createElement('div'); token.className = 'song-token'; token.innerText = 'S' + songId; token.dataset.songId = songId;
-        token.addEventListener('dblclick', () => this.loadSong(songId));
-        document.getElementById('song-bank').appendChild(token);
+    saveSong(asNew = false) {
+        const seqs = this.getTimelineSequences();
+        const snapshot = {
+            bpm: this.BPM,
+            key: this.audio.activeKey,
+            scale: this.audio.activeScale,
+            rhythm: this.activeRhythm,
+            kitIndex: this.audio.activeKitIndex,
+            sequences: seqs
+        };
+        
+        if (this.editingSongId !== null && !asNew) {
+            this.songMemory[this.editingSongId] = snapshot;
+            this.resetSongEditMode();
+        } else {
+            const songId = this.songMemory.length;
+            this.songMemory.push(snapshot);
+            
+            const token = document.createElement('div');
+            token.className = 'song-token';
+            token.innerText = 'S' + songId;
+            token.dataset.songId = songId;
+            token.draggable = true;
+            
+            token.addEventListener('dragstart', e => { 
+                e.dataTransfer.setData('source', 'song-bank'); 
+                e.dataTransfer.setData('songId', songId); 
+                setTimeout(() => token.classList.add('dragging'), 0); 
+            });
+            token.addEventListener('dragend', () => token.classList.remove('dragging'));
+
+            token.addEventListener('click', e => {
+                if (e.shiftKey || e.ctrlKey || e.metaKey) {
+                    token.remove();
+                    this.songMemory[songId] = null;
+                }
+            });
+
+            token.addEventListener('dblclick', () => this.loadSong(songId));
+            document.getElementById('song-bank').appendChild(token);
+            
+            if (asNew) {
+                this.resetSongEditMode();
+            }
+        }
     }
 
     loadSong(songId) {
         if (!this.songMemory[songId]) return;
-        const seqs = this.songMemory[songId];
-        const container = document.getElementById('timeline-container'); container.innerHTML = '';
+        
+        this.editingSongId = parseInt(songId);
+        const btnSaveSong = document.getElementById('btn-save-song');
+        btnSaveSong.innerText = 'UPDATE SONG';
+        btnSaveSong.style.backgroundColor = 'var(--yellow)';
+        btnSaveSong.style.color = '#000';
+        document.getElementById('btn-save-song-new').style.display = 'inline-block';
+
+        const songData = this.songMemory[songId];
+        const seqs = songData.sequences || songData;
+
+        if (songData.bpm) {
+            this.BPM = songData.bpm;
+            document.getElementById('bpm-slider').value = this.BPM;
+            document.getElementById('bpm-display').innerText = this.BPM;
+            this.stepTime = 60 / this.BPM / 2;
+            this.audio.setDelayTime(this.stepTime * 1.5);
+        }
+        if (songData.key && songData.scale) {
+            this.audio.setTheory(songData.key, songData.scale);
+            document.getElementById('sel-key').value = songData.key;
+            document.getElementById('sel-scale').value = songData.scale;
+        }
+        if (songData.rhythm) {
+            this.activeRhythm = songData.rhythm;
+            document.getElementById('sel-rhythm').value = songData.rhythm;
+        }
+        if (songData.kitIndex !== undefined) {
+            this.audio.activeKitIndex = songData.kitIndex;
+            document.getElementById('btn-kit').innerText = `ACTIVE KIT: ${this.audio.KITS[songData.kitIndex]}`;
+        }
+        
+        const container = document.getElementById('timeline-container');
+        container.innerHTML = '';
+        
         seqs.forEach(seq => {
             this.buildTimelineRow();
-            const rows = document.querySelectorAll('.timeline-row'); const targetRow = rows[rows.length - 1]; const slots = targetRow.querySelectorAll('.timeline-slot');
+            const rows = document.querySelectorAll('.timeline-row');
+            const targetRow = rows[rows.length - 1];
+            const slots = targetRow.querySelectorAll('.timeline-slot');
+            
             for(let i=0; i < seq.length; i++) {
                 if (seq[i] !== -1 && this.loopMemory[seq[i]]) {
                     const token = document.querySelector(`.loop-token[data-loop-id="${seq[i]}"]`);
                     if (token) {
-                        const clone = token.cloneNode(true); clone.addEventListener('click', (ev) => { if(ev.shiftKey) clone.remove(); });
+                        const clone = token.cloneNode(true);
+                        clone.addEventListener('click', (ev) => { if(ev.shiftKey || ev.ctrlKey || ev.metaKey) clone.remove(); });
                         clone.addEventListener('dblclick', () => { this.loadLoopToGrid(clone.dataset.loopId); });
                         slots[i].appendChild(clone);
                     }
                 }
             }
         });
+    }
+
+    resetSongEditMode() {
+        this.editingSongId = null;
+        const btnSaveSong = document.getElementById('btn-save-song'); 
+        btnSaveSong.innerText = 'SAVE SONG'; 
+        btnSaveSong.style.backgroundColor = 'var(--purple)'; 
+        btnSaveSong.style.color = '#fff';
+        document.getElementById('btn-save-song-new').style.display = 'none';
     }
 
     displayLoopVisualOnly(loopId) {
@@ -419,12 +536,39 @@ class JamBoardCore {
         this.editingLoopId = parseInt(loopId);
         const btnSave = document.getElementById('btn-save'); btnSave.innerText = 'UPDATE LOOP'; btnSave.style.backgroundColor = 'var(--yellow)'; btnSave.style.color = '#000';
         document.getElementById('btn-save-new').style.display = 'inline-block';
+
+        const loop = this.loopMemory[loopId];
+
+        if (loop.bpm) {
+            this.BPM = loop.bpm;
+            document.getElementById('bpm-slider').value = this.BPM;
+            document.getElementById('bpm-display').innerText = this.BPM;
+            this.stepTime = 60 / this.BPM / 2;
+            this.audio.setDelayTime(this.stepTime * 1.5);
+        }
+        if (loop.key && loop.scale) {
+            this.audio.setTheory(loop.key, loop.scale);
+            document.getElementById('sel-key').value = loop.key;
+            document.getElementById('sel-scale').value = loop.scale;
+        }
+        if (loop.rhythm) {
+            this.activeRhythm = loop.rhythm;
+            document.getElementById('sel-rhythm').value = loop.rhythm;
+        }
+        if (loop.kitIndex !== undefined) {
+            this.audio.activeKitIndex = loop.kitIndex;
+            document.getElementById('btn-kit').innerText = `ACTIVE KIT: ${this.audio.KITS[loop.kitIndex]}`;
+        }
+
         this.displayLoopVisualOnly(this.editingLoopId);
     }
 
     resetEditMode() {
         this.editingLoopId = null;
-        const btnSave = document.getElementById('btn-save'); btnSave.innerText = 'SAVE LOOP'; btnSave.style.backgroundColor = '#444'; btnSave.style.color = '#fff';
+        const btnSave = document.getElementById('btn-save'); 
+        btnSave.innerText = 'SAVE LOOP'; 
+        btnSave.style.backgroundColor = 'var(--orange)'; 
+        btnSave.style.color = '#000';
         document.getElementById('btn-save-new').style.display = 'none';
     }
 
@@ -464,7 +608,7 @@ class JamBoardCore {
         if (!target.classList.contains('cell')) return;
         const blocks = target.querySelectorAll('.block'); const count = blocks.length; if (count === 0) return;
         const h = 100 / count; 
-        blocks.forEach((b, i) => { b.style.position = 'absolute'; b.style.height = `${h}%`; b.style.width = 'calc(100% - 36px)'; b.style.left = '18px'; b.style.bottom = `${i * h}%`; });
+        blocks.forEach((b, i) => { b.style.position = 'absolute'; b.style.height = `${h}%`; b.style.width = 'calc(100% - 14px)'; b.style.left = '7px'; b.style.bottom = `${i * h}%`; });
     }
 
     layoutFxTokens(target, fxData) {
@@ -532,7 +676,7 @@ class JamBoardCore {
     createVoiceBankToken(vId) {
         const token = document.createElement('div'); token.className = 'block voice-block'; token.dataset.type = 'voice'; token.dataset.vid = vId; token.draggable = true;
         token.innerHTML = `<span style="font-size: 14px; font-weight: bold;">V${vId}</span>`;
-        token.addEventListener('click', (e) => { if (e.shiftKey) token.remove(); });
+        token.addEventListener('click', (e) => { if (e.shiftKey || e.ctrlKey || e.metaKey) token.remove(); });
         token.addEventListener('dragstart', e => { e.dataTransfer.setData('source', 'voice-bank'); e.dataTransfer.setData('type', 'voice'); e.dataTransfer.setData('vid', vId); setTimeout(() => token.classList.add('dragging'), 0); });
         token.addEventListener('dragend', () => token.classList.remove('dragging'));
         document.getElementById('voice-bank').appendChild(token);
@@ -593,16 +737,21 @@ class JamBoardCore {
 
     handleGridDrop(e, target) { 
         e.preventDefault(); e.stopPropagation();
-        const source = e.dataTransfer.getData('source'); const type = e.dataTransfer.getData('type');
+        const source = e.dataTransfer.getData('source'); 
+        const type = e.dataTransfer.getData('type');
+        
+        // Extract variables synchronously before the drop event terminates
+        const transferredColor = e.dataTransfer.getData('color');
+        const transferredFx = e.dataTransfer.getData('fx');
+        const transferredVid = e.dataTransfer.getData('vid');
+
         const dragging = document.querySelector('.dragging');
         const isVoiceCell = target.classList.contains('voice-sub-cell') || target.classList.contains('voice-sub-fx');
 
         if (source === 'voice-bank') {
             if (target.classList.contains('voice-sub-cell')) {
-                const vId = e.dataTransfer.getData('vid'); 
-                // DEFERRED: Prevents drag-lock when adding from voice bank
                 setTimeout(() => {
-                    target.appendChild(this.createVoiceBlockDOM(vId, 0, 1.0, 1.0)); 
+                    target.appendChild(this.createVoiceBlockDOM(transferredVid, 0, 1.0, 1.0)); 
                     this.layoutBlocks(target);
                 }, 0);
             }
@@ -626,18 +775,15 @@ class JamBoardCore {
         if (source === 'palette') {
             if (type === 'block' && target.classList.contains('cell') && !isVoiceCell) { 
                 const activeKit = this.audio.KITS[this.audio.activeKitIndex];
-                // DEFERRED: Prevents drag-lock when adding brand new blocks from palette
                 setTimeout(() => {
-                    target.appendChild(this.createBlockDOM(e.dataTransfer.getData('color'), 0, 1.0, activeKit, 1.0)); 
+                    target.appendChild(this.createBlockDOM(transferredColor, 0, 1.0, activeKit, 1.0)); 
                     this.layoutBlocks(target);
                 }, 0);
             } 
             else if (type === 'fx' && (target.classList.contains('cell') || target.classList.contains('row-fx-slot'))) {
-                const fxData = e.dataTransfer.getData('fx'); 
-                // DEFERRED: Prevents drag-lock when adding brand new FX tokens
                 setTimeout(() => {
-                    target.appendChild(this.createFxDOM(fxData, 1.0, 'all')); 
-                    this.layoutFxTokens(target, fxData);
+                    target.appendChild(this.createFxDOM(transferredFx, 1.0, 'all')); 
+                    this.layoutFxTokens(target, transferredFx);
                 }, 0);
             }
         }

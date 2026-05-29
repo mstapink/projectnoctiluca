@@ -7,33 +7,66 @@
         :root {
             --bg: #111; --grid-bg: #222;
             --red: #ff3366; --yellow: #ffcc00; --blue: #00ccff; --green: #33ff66; --purple: #cc33ff;
+            --orange: #ff8c00;
             --active-col: rgba(255, 255, 255, 0.1);
         }
-        body { background-color: var(--bg); color: #fff; font-family: monospace; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
-        #controls { margin-bottom: 10px; display: flex; gap: 15px; flex-wrap: wrap; justify-content: center; width: 100%; max-width: 1100px; align-items: center; }
-        button { padding: 10px 20px; background: #444; color: #fff; border: none; cursor: pointer; font-family: monospace; font-size: 14px; border-radius: 4px; font-weight: bold; }
-        button:hover { background: #666; }
-        button:disabled { background: #222; color: #555; cursor: not-allowed; }
-        #btn-play-grid { background: var(--green); color: #000; }
-        #btn-play-grid:disabled { background: #1a4d29; color: #555; }
-        #btn-play-song { background: var(--yellow); color: #000; }
-        #btn-stop { background: var(--red); color: #fff; }
-        #btn-kit { background: var(--blue); color: #000; }
-        .slider-container { display: flex; align-items: center; gap: 10px; background: #333; padding: 10px 15px; border-radius: 4px; }
-        .instructions { font-size: 12px; color: #888; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 1px; text-align: center; line-height: 1.5;}
+        body { background-color: var(--bg); color: #fff; font-family: monospace; margin: 0; padding: 15px 20px; display: flex; flex-direction: column; align-items: center; }
+        
+        /* Typography & Instructions */
+        .instructions { font-size: 14px; color: #aaa; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px; text-align: center; line-height: 1.5; font-weight: bold;}
         .highlight { color: #fff; }
         
-        #main-workspace { display: flex; gap: 30px; width: 100%; max-width: 1200px; justify-content: center; align-items: flex-start; }
-        #main-workspace.locked { pointer-events: none; opacity: 0.7; }
-        #left-panel { display: flex; flex-direction: column; align-items: center; width: 100%;}
+        button { padding: 8px 16px; background: #444; color: #fff; border: 1px solid #555; cursor: pointer; font-family: monospace; font-size: 12px; border-radius: 4px; font-weight: bold; transition: 0.1s; }
+        button:hover { background: #666; }
+        button:disabled { background: #222; color: #555; border-color: #333; cursor: not-allowed; }
         
-        #palette { display: flex; gap: 15px; flex-wrap: wrap; margin-bottom: 20px; padding: 15px; background: var(--grid-bg); border-radius: 8px; align-items: center; justify-content: center; width: 100%; box-sizing: border-box;}
-        .palette-divider { width: 2px; height: 30px; background: #444; margin: 0 5px; }
+        #btn-play-grid { background: var(--green); color: #000; border-color: #fff; font-size: 14px; padding: 10px 15px;}
+        #btn-play-grid:disabled { background: #1a4d29; color: #555; border-color: #333;}
+        #btn-play-song { background: var(--yellow); color: #000; border-color: #fff; font-size: 14px; padding: 10px 15px;}
+        #btn-stop { background: var(--red); color: #fff; border-color: #fff; font-size: 14px; padding: 10px;}
+        #btn-kit { background: var(--blue); color: #000; border-color: #fff;}
+        #btn-save { background: var(--orange); color: #000; border-color: #fff;}
         
-        .theory-controls { display: flex; gap: 10px; align-items: center; }
-        .theory-controls select { background: #111; color: var(--yellow); border: 2px solid #555; padding: 6px 10px; border-radius: 4px; font-family: monospace; font-weight: bold; font-size: 12px; cursor: pointer; text-transform: uppercase; outline: none; transition: 0.1s;}
+        /* Header Boxes */
+        #header-container { display: flex; gap: 15px; width: 100%; max-width: 1200px; margin-bottom: 15px; box-sizing: border-box; align-items: stretch; }
+        
+        #header-panel { flex-grow: 1; display: flex; gap: 20px; background: var(--grid-bg); padding: 10px 15px; border-radius: 4px; border: 1px solid #444; box-sizing: border-box; }
+        #playback-panel { background: var(--grid-bg); padding: 10px 15px; border-radius: 4px; border: 1px solid #444; display: flex; flex-direction: column; gap: 8px; justify-content: center; box-sizing: border-box; flex-shrink: 0; }
+        
+        .header-col { display: flex; flex-direction: column; gap: 8px; justify-content: center; }
+        .header-row { display: flex; gap: 10px; align-items: center; justify-content: flex-start; }
+        
+        .slider-container { display: flex; align-items: center; gap: 10px; background: #111; padding: 6px 12px; border-radius: 4px; border: 1px solid #444; }
+        .slider-container label { font-size: 12px; font-weight: bold; }
+        .slider-container input { width: 80px; accent-color: var(--yellow); }
+
+        .theory-controls select { background: #111; color: var(--yellow); border: 1px solid #444; padding: 6px 10px; border-radius: 4px; font-family: monospace; font-weight: bold; font-size: 12px; cursor: pointer; text-transform: uppercase; outline: none; transition: 0.1s;}
         .theory-controls select:hover { border-color: #888; }
         
+        /* Workspace & Grid Layout */
+        #main-workspace { display: flex; gap: 15px; width: 100%; max-width: 1200px; justify-content: center; align-items: flex-start; }
+        #main-workspace.locked { pointer-events: none; opacity: 0.7; }
+        
+        #left-panel { display: flex; flex-direction: column; align-items: center; width: 100%; flex-grow: 1; }
+        #grid { display: grid; grid-template-columns: 80px repeat(8, 1fr) 50px; grid-auto-rows: auto; gap: 3px; padding: 10px; border-radius: 4px; background-color: transparent; width: 100%; box-sizing: border-box; border: 1px solid #333; }
+        
+        .row-controls { display: flex; flex-direction: column; align-items: flex-end; justify-content: center; padding-right: 10px; gap: 2px; }
+        .row-label { font-size: 10px; color: #ccc; font-weight: bold; text-transform: uppercase; text-align: right;}
+        .row-volume { width: 60px; cursor: pointer; accent-color: var(--green); height: 12px; }
+        
+        .cell { background: #1a1a1a; border: 1px solid #333; border-radius: 4px; display: flex; flex-direction: column-reverse; align-items: center; justify-content: flex-start; padding: 4px; gap: 2px; position: relative; height: 70px; box-sizing: border-box;}
+        .cell.active { background: var(--active-col); border-color: #666;}
+        
+        .voice-sub-cell { height: 35px; border: 1px dashed #444; background: rgba(0,0,0,0.3); margin-bottom: 5px; } 
+        .voice-sub-cell.active { background: rgba(255,255,255,0.05); border-color: #888; }
+        .row-controls.voice-sub-controls { height: 35px; justify-content: center; margin-bottom: 5px; }
+        .row-fx-slot.voice-sub-fx { height: 35px; border: 1px dashed #444; background: #111; margin-bottom: 5px;}
+        .row-fx-slot.voice-sub-fx::before { content: "MIC FX"; top: -10px; color: #777; font-size: 8px;}
+
+        .row-fx-slot { background: #151515; border: 1px solid #444; border-radius: 4px; display: flex; flex-direction: column-reverse; align-items: center; justify-content: flex-start; gap: 4px; padding: 4px; position: relative; }
+        .row-fx-slot::before { content: "ROW FX"; position: absolute; top: -12px; font-size: 8px; color: #666; font-weight: bold; width: 100%; text-align: center; }
+
+        /* Tokens & Blocks */
         .block { width: 50px; height: 50px; cursor: grab; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-weight: bold; color: #000; user-select: none; box-shadow: 0 4px 10px rgba(0,0,0,0.5); overflow: hidden; position: relative; border: 3px solid transparent; box-sizing: border-box; transition: border-color 0.1s;}
         .block.dragging { opacity: 0.5; }
         .block[data-color="red"] { background: var(--red); }
@@ -45,18 +78,18 @@
         .voice-block { background: linear-gradient(135deg, #666, #333) !important; border: 2px solid #ff66b2 !important; color: white !important; height: 30px !important;} 
         .voice-block .vol-bar { background: rgba(255,255,255,0.3) !important; }
 
-        /* FIXED: Block UI Stacking and Shrink Rules */
         .block-ui { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 2; pointer-events: none; }
         .val-container { display: flex; flex-direction: column; gap: 1px; align-items: center; justify-content: center; }
         .voice-block .val-container { flex-direction: row; gap: 4px; }
-        .val-container span { flex-shrink: 0; } /* Prevents text from collapsing and overlapping */
+        .val-container span { flex-shrink: 0; }
         .pitch-val { color: #000; font-size: 12px; font-weight: bold; line-height: 1; }
         .speed-val { color: #fff; font-size: 9px; font-weight: bold; text-shadow: 1px 1px 0 #000; line-height: 1; margin-top: 1px; }
         .voice-label { position: absolute; top: 2px; right: 4px; font-size: 8px; font-weight: bold; color: #fff; z-index: 3; pointer-events: none; }
 
         .block .vol-bar { position: absolute; bottom: 0; left: 0; width: 100%; background: rgba(0,0,0,0.25); z-index: 1; transition: height 0.1s; pointer-events: none;}
+        .cell .block { width: 100%; height: 20px; cursor: pointer; font-size: 10px; position: relative; z-index: 2;}
 
-        .fx-token { width: 45px; height: 20px; border-radius: 4px; color: #fff; font-size: 9px; font-weight: bold; display: flex; justify-content: center; align-items: center; cursor: grab; border: 2px solid #888; box-shadow: 0 2px 5px rgba(0,0,0,0.5); user-select: none; position: relative; overflow: hidden;}
+        .fx-token { width: 45px; height: 20px; border-radius: 4px; color: #fff; font-size: 9px; font-weight: bold; display: flex; justify-content: center; align-items: center; cursor: grab; border: 1px solid #888; box-shadow: 0 2px 5px rgba(0,0,0,0.5); user-select: none; position: relative; overflow: hidden;}
         .fx-token.dragging { opacity: 0.5; }
         .fx-token[data-fx="crush"] { background: #522; border-color: #f66; }
         .fx-token[data-fx="echo"] { background: #225; border-color: #66f; }
@@ -65,55 +98,40 @@
         .fx-token .fx-label { position: relative; z-index: 2; pointer-events: none;}
         .fx-bar { position: absolute; bottom: 0; left: 0; width: 100%; background: rgba(255,255,255,0.3); z-index: 1; pointer-events: none; transition: height 0.1s; }
         
-        #grid { display: grid; grid-template-columns: 100px repeat(8, 70px) 70px; grid-auto-rows: auto; gap: 5px; padding: 15px; border-radius: 12px; transition: background-color 0.1s ease-out; background-color: transparent; }
-        
-        .row-controls { display: flex; flex-direction: column; align-items: flex-end; justify-content: center; padding-right: 15px; gap: 5px; }
-        .row-label { font-size: 12px; color: #ccc; font-weight: bold; text-transform: uppercase; }
-        .row-volume { width: 70px; cursor: pointer; accent-color: var(--green); }
-        
-        .cell { background: var(--grid-bg); border: 1px solid #333; border-radius: 4px; display: flex; flex-direction: column-reverse; align-items: center; justify-content: flex-start; padding: 5px 18px; gap: 2px; position: relative; height: 85px; box-sizing: border-box;}
-        .cell.active { background: var(--active-col); }
-        
-        .voice-sub-cell { height: 40px; border: 1px dashed #555; background: rgba(0,0,0,0.3); margin-bottom: 15px; } 
-        .voice-sub-cell.active { background: rgba(255,255,255,0.05); border-color: #888; }
-        .row-controls.voice-sub-controls { height: 40px; justify-content: center; margin-bottom: 15px; }
-        .row-fx-slot.voice-sub-fx { height: 40px; border: 1px dashed #555; background: #111; margin-bottom: 15px;}
-        .row-fx-slot.voice-sub-fx::before { content: "MIC FX"; top: -12px; color: #777; }
-
-        .cell .block { width: 100%; height: 20px; cursor: pointer; font-size: 10px; position: relative; z-index: 2;}
-        
-        .cell .fx-token { position: absolute; width: 12px; height: 35px; z-index: 1; color: transparent; border-radius: 2px; border-width: 1px;}
+        .cell .fx-token { position: absolute; width: 10px; height: 35px; z-index: 1; color: transparent; border-radius: 2px;}
         .cell .fx-token .fx-label { display: none; }
         .cell .fx-token[data-fx="crush"] { left: 3px; top: 5px; }
         .cell .fx-token[data-fx="echo"] { left: 3px; bottom: 5px; }
         .cell .fx-token[data-fx="reverb"] { right: 3px; top: 5px; }
         .cell .fx-token[data-fx="chorus"] { right: 3px; bottom: 5px; }
-        .cell .fx-token[data-fx="crush"]::after { content: "C"; color: #fff; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 2;}
-        .cell .fx-token[data-fx="echo"]::after { content: "E"; color: #fff; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 2;}
-        .cell .fx-token[data-fx="reverb"]::after { content: "R"; color: #fff; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 2;}
-        .cell .fx-token[data-fx="chorus"]::after { content: "H"; color: #fff; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 2;}
-        
-        .row-fx-slot { background: #1a1a1a; border: 2px solid #444; border-radius: 4px; display: flex; flex-direction: column-reverse; align-items: center; justify-content: flex-start; gap: 4px; padding: 5px; position: relative; }
-        .row-fx-slot::before { content: "ROW FX"; position: absolute; top: -15px; font-size: 9px; color: #666; font-weight: bold; width: 100%; text-align: center; }
+        .cell .fx-token[data-fx="crush"]::after { content: "C"; color: #fff; font-size: 8px; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 2;}
+        .cell .fx-token[data-fx="echo"]::after { content: "E"; color: #fff; font-size: 8px; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 2;}
+        .cell .fx-token[data-fx="reverb"]::after { content: "R"; color: #fff; font-size: 8px; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 2;}
+        .cell .fx-token[data-fx="chorus"]::after { content: "H"; color: #fff; font-size: 8px; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 2;}
 
-        #right-panel { display: flex; flex-direction: column; gap: 20px; width: 250px; }
-        .panel-box { background: var(--grid-bg); border: 1px solid #444; border-radius: 8px; padding: 15px; display: flex; flex-direction: column;}
-        .panel-title { font-size: 12px; color: #888; margin-bottom: 10px; text-transform: uppercase; }
+        /* Right Panel Banks */
+        #right-panel { display: flex; flex-direction: column; gap: 10px; width: 220px; flex-shrink: 0; }
+        #btn-clear { width: 100%; background: #444; border: 1px solid #777; padding: 10px; font-size: 14px; margin-bottom: 2px;}
+        #btn-clear:hover { background: var(--red); color: #fff; border-color: #fff; }
+
+        .panel-box { background: var(--grid-bg); border: 1px solid #444; border-radius: 4px; padding: 10px; display: flex; flex-direction: column;}
+        .panel-title { font-size: 11px; color: #888; margin-bottom: 8px; text-transform: uppercase; font-weight: bold;}
         
-        #loop-bank, #song-bank, #voice-bank { display: flex; flex-wrap: wrap; gap: 10px; overflow-y: auto; align-content: flex-start; min-height: 120px; }
-        #voice-bank { min-height: 80px; }
+        #loop-bank, #song-bank, #voice-bank { display: flex; flex-wrap: wrap; gap: 8px; overflow-y: auto; align-content: flex-start; min-height: 80px; }
+        #voice-bank { min-height: 50px; }
         
-        .loop-token { width: 50px; height: 50px; background: #111; border-radius: 4px; display: flex; gap: 2px; padding: 4px; cursor: grab; border: 2px solid #555; overflow: hidden; transition: transform 0.1s; user-select: none; }
-        .loop-token:hover { transform: scale(1.05); }
+        .loop-token { width: 40px; height: 40px; background: #111; border-radius: 2px; display: flex; gap: 1px; padding: 3px; cursor: grab; border: 1px solid #555; overflow: hidden; transition: transform 0.1s; user-select: none; box-sizing: border-box;}
+        .loop-token:hover { transform: scale(1.05); border-color: #aaa;}
         .mini-col { display: flex; flex-direction: column-reverse; flex: 1; gap: 1px; justify-content: flex-start; }
-        .mini-block { width: 100%; height: 4px; border-radius: 1px; }
+        .mini-block { width: 100%; height: 3px; border-radius: 1px; }
 
-        .song-token { width: 50px; height: 50px; background: var(--yellow); color: #000; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-weight: bold; cursor: pointer; border: 2px solid #fff; user-select: none; transition: 0.1s;}
+        .song-token { width: 40px; height: 40px; background: var(--yellow); color: #000; border-radius: 2px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; cursor: pointer; border: 1px solid #fff; user-select: none; transition: 0.1s;}
         .song-token:hover { transform: scale(1.05); }
         
-        #bottom-panel { width: 100%; max-width: 1200px; margin-top: 20px; }
-        .timeline-row { display: flex; gap: 10px; overflow-x: auto; padding: 15px; background: var(--grid-bg); border-radius: 8px; min-height: 60px; border: 1px solid #444; }
-        .timeline-slot { width: 60px; height: 60px; flex-shrink: 0; border: 2px solid #555; border-radius: 4px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.1s; }
+        /* Timelines */
+        #bottom-panel { width: 100%; max-width: 1200px; margin-top: 5px; }
+        .timeline-row { display: flex; gap: 10px; overflow-x: auto; padding: 10px; background: var(--grid-bg); border-radius: 4px; min-height: 50px; border: 1px solid #444; }
+        .timeline-slot { width: 44px; height: 44px; flex-shrink: 0; border: 1px dashed #555; border-radius: 2px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.1s; box-sizing: border-box; }
         .timeline-slot:hover { border-color: #888; background: rgba(255,255,255,0.05); }
         .timeline-slot.active-macro { border-color: var(--yellow); background: rgba(255, 204, 0, 0.15); border-style: solid;}
         .timeline-slot .loop-token { width: 100%; height: 100%; border: none; padding: 2px; }
@@ -121,21 +139,6 @@
 </head>
 <body>
 
-    <div id="controls">
-        <button id="btn-play-grid">PLAY GRID</button>
-        <button id="btn-play-song">PLAY SONG</button>
-        <button id="btn-stop">STOP</button>
-        <button id="btn-kit">ACTIVE KIT: TECHNO</button>
-        <button id="btn-mic">🎤 REC VOICE</button>
-        <button id="btn-clear">CLEAR GRID</button>
-        <button id="btn-save">SAVE LOOP</button>
-        <button id="btn-save-new" style="display: none; background: var(--blue); color: #000;">SAVE AS NEW</button>
-        <div class="slider-container">
-            <label for="bpm-slider">BPM: <span id="bpm-display">110</span></label>
-            <input type="range" id="bpm-slider" min="60" max="200" value="110">
-        </div>
-    </div>
-    
     <div class="instructions">
         <span class="highlight">PITCH:</span> Scroll on Blocks *
         <span class="highlight">SPEED:</span> Alt+Scroll on Blocks *
@@ -143,29 +146,64 @@
         <span class="highlight">ROUTING:</span> Ctrl+Click FX Tokens
     </div>
 
-    <div id="main-workspace">
-        <div id="left-panel">
-            <div id="palette">
-                <div class="block" draggable="true" data-type="block" data-color="red"><span class="pitch-val">R</span></div>
-                <div class="block" draggable="true" data-type="block" data-color="yellow"><span class="pitch-val">Y</span></div>
-                <div class="block" draggable="true" data-type="block" data-color="blue"><span class="pitch-val">B</span></div>
-                <div class="block" draggable="true" data-type="block" data-color="green"><span class="pitch-val">G</span></div>
-                <div class="block" draggable="true" data-type="block" data-color="purple"><span class="pitch-val">P</span></div>
-                <div class="palette-divider"></div>
-                <div class="fx-token" draggable="true" data-type="fx" data-fx="crush" data-amount="1.0"><div class="fx-bar" style="height: 100%"></div><span class="fx-label">CRUSH</span></div>
-                <div class="fx-token" draggable="true" data-type="fx" data-fx="echo" data-amount="1.0"><div class="fx-bar" style="height: 100%"></div><span class="fx-label">ECHO</span></div>
-                <div class="fx-token" draggable="true" data-type="fx" data-fx="reverb" data-amount="1.0"><div class="fx-bar" style="height: 100%"></div><span class="fx-label">REVERB</span></div>
-                <div class="fx-token" draggable="true" data-type="fx" data-fx="chorus" data-amount="1.0"><div class="fx-bar" style="height: 100%"></div><span class="fx-label">CHORUS</span></div>
-                <div class="palette-divider"></div>
-                <div class="theory-controls">
+    <div id="header-container">
+        <div id="header-panel">
+            <div id="palette" class="header-col">
+                <div class="header-row">
+                    <div class="block" draggable="true" data-type="block" data-color="red"><span class="pitch-val">R</span></div>
+                    <div class="block" draggable="true" data-type="block" data-color="yellow"><span class="pitch-val">Y</span></div>
+                    <div class="block" draggable="true" data-type="block" data-color="blue"><span class="pitch-val">B</span></div>
+                    <div class="block" draggable="true" data-type="block" data-color="green"><span class="pitch-val">G</span></div>
+                    <div class="block" draggable="true" data-type="block" data-color="purple"><span class="pitch-val">P</span></div>
+                </div>
+                <div class="header-row">
+                    <div class="fx-token" draggable="true" data-type="fx" data-fx="crush" data-amount="1.0"><div class="fx-bar" style="height: 100%"></div><span class="fx-label">CRUSH</span></div>
+                    <div class="fx-token" draggable="true" data-type="fx" data-fx="echo" data-amount="1.0"><div class="fx-bar" style="height: 100%"></div><span class="fx-label">ECHO</span></div>
+                    <div class="fx-token" draggable="true" data-type="fx" data-fx="reverb" data-amount="1.0"><div class="fx-bar" style="height: 100%"></div><span class="fx-label">REVERB</span></div>
+                    <div class="fx-token" draggable="true" data-type="fx" data-fx="chorus" data-amount="1.0"><div class="fx-bar" style="height: 100%"></div><span class="fx-label">CHORUS</span></div>
+                </div>
+            </div>
+
+            <div class="header-col" style="flex-grow: 1; justify-content: space-between;">
+                <div class="header-row" style="justify-content: space-between; width: 100%;">
+                    <div class="header-row">
+                        <button id="btn-mic">🎤 REC VOICE</button>
+                        <button id="btn-kit">ACTIVE KIT: TECHNO</button>
+                    </div>
+                    <div class="header-row">
+                        <button id="btn-save">SAVE LOOP</button>
+                        <button id="btn-save-new" style="display: none; background: var(--blue); color: #000;">SAVE AS NEW</button>
+                        <button id="btn-save-song" style="background: var(--purple); color: #fff;">SAVE SONG</button>
+                        <button id="btn-save-song-new" style="display: none; background: var(--blue); color: #000;">SAVE AS NEW</button>
+                    </div>
+                </div>
+                <div class="header-row theory-controls" style="justify-content: flex-end; width: 100%;">
+                    <div class="slider-container">
+                        <label for="bpm-slider">BPM: <span id="bpm-display">110</span></label>
+                        <input type="range" id="bpm-slider" min="60" max="200" value="110">
+                    </div>
                     <select id="sel-key"><option value="60">C</option><option value="61">Db / C#</option><option value="62">D</option><option value="63">Eb / D#</option><option value="64">E</option><option value="65">F</option><option value="66">Gb / F#</option><option value="67">G</option><option value="68">Ab / G#</option><option value="69">A</option><option value="70">Bb / A#</option><option value="71">B</option></select>
                     <select id="sel-scale"><option value="MINOR PENT">Min Pent</option><option value="PENTATONIC">Maj Pent</option><option value="MINOR">Minor</option><option value="MAJOR">Major</option><option value="BLUES">Blues</option></select>
                     <select id="sel-rhythm"><option value="STRAIGHT">Straight</option><option value="LIGHT_SHUFFLE">Light Shuffle (54%)</option><option value="CLASSIC_MPC">Classic MPC (60%)</option><option value="SWING">Swing (67%)</option><option value="HARD_SHUFFLE">Hard Shuffle (75%)</option><option value="RUSHED">Rushed (Push)</option></select>
                 </div>
             </div>
+        </div>
+
+        <div id="playback-panel">
+            <div style="display: flex; gap: 8px;">
+                <button id="btn-play-grid">PLAY GRID</button>
+                <button id="btn-play-song">PLAY SONG</button>
+            </div>
+            <button id="btn-stop">STOP</button>
+        </div>
+    </div>
+
+    <div id="main-workspace">
+        <div id="left-panel">
             <div id="grid"></div>
         </div>
         <div id="right-panel">
+            <button id="btn-clear">CLEAR GRID</button>
             <div class="panel-box"><div class="panel-title">Voice Bank</div><div id="voice-bank"></div></div>
             <div class="panel-box"><div class="panel-title">Loop Bank</div><div id="loop-bank"></div></div>
             <div class="panel-box"><div class="panel-title">Song Bank</div><div id="song-bank"></div></div>
@@ -173,17 +211,15 @@
     </div>
 
     <div id="bottom-panel">
-        <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 10px;">
-            <div class="panel-title" style="margin-left: 5px; margin-bottom: 0;">Song Timelines</div>
-            <div style="display: flex; gap: 10px;">
+        <div id="timeline-container" style="display: flex; flex-direction: column; gap: 5px;"></div>
+        
+        <div style="margin-top: 10px; display: flex; justify-content: flex-end; align-items: center; gap: 15px;">
+            <div style="display: flex; gap: 8px;">
                 <button id="btn-add-timeline" style="background: var(--blue); color: #000; padding: 5px 10px;">+ TIMELINE</button>
                 <button id="btn-remove-timeline" style="background: var(--red); padding: 5px 10px;">- TIMELINE</button>
             </div>
-        </div>
-        <div id="timeline-container" style="display: flex; flex-direction: column; gap: 5px;"></div>
-        <div style="margin-top: 15px; display: flex; gap: 10px;">
-            <button id="btn-save-song" style="background: var(--purple); color: #fff;">SAVE SONG</button>
-            <button id="btn-clear-song">CLEAR TIMELINES</button>
+            <div style="width: 2px; height: 20px; background: #444;"></div>
+            <button id="btn-clear-song" style="background: #444;">CLEAR TIMELINES</button>
         </div>
     </div>
 
